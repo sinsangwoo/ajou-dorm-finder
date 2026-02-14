@@ -24,7 +24,7 @@ const HeroSection = ({ onCategorySelect }: HeroSectionProps) => {
         <div className="text-center mb-12 animate-fade-in-up">
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/10 backdrop-blur-sm border border-white/20 text-white/90 text-sm mb-6">
             <Sparkles className="w-4 h-4" />
-            <span>2025학년도 기숙사 배정 안내</span>
+            <span>아주대 기숙사 정보 플랫폼</span>
           </div>
           <h1 className="text-4xl md:text-6xl font-bold text-white mb-4 tracking-tight">
             어떤 기숙사에
