@@ -1,4 +1,4 @@
-import { CheckCircle2, XCircle, ArrowLeft } from "lucide-react";
+import { CheckCircle2, XCircle, ArrowLeft, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -85,9 +85,26 @@ const EligibilityResult = ({
                   ))}
                 </div>
 
+                {/* Notices */}
+                {isEligible && dorm.notices && dorm.notices.length > 0 && (
+                  <div className="mb-4 p-3 bg-orange-50 dark:bg-orange-950/30 rounded-lg border border-orange-200 dark:border-orange-800">
+                    {dorm.notices.map((notice, idx) => (
+                      <div key={idx} className="flex items-start gap-2 text-xs text-orange-800 dark:text-orange-200 mb-1 last:mb-0">
+                        <AlertCircle className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+                        <span>{notice}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
                 {/* Info */}
                 <div className="text-xs text-muted-foreground space-y-1">
-                  <p>정원: {dorm.capacity}</p>
+                  <p>
+                    정원: {dorm.capacity}
+                    {dorm.capacityNote && (
+                      <span className="ml-1 text-[10px]">{dorm.capacityNote}</span>
+                    )}
+                  </p>
                   <p>방 유형: {dorm.roomType}</p>
                 </div>
 
