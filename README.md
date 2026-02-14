@@ -1,73 +1,112 @@
-# Welcome to your Lovable project
+# 아주대 긱사 어디가
 
-## Project info
+아주대학교 기숙사 지원 자격 확인 및 배정 점수 계산 서비스입니다.
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+## 📋 주요 기능
 
-## How can I edit this code?
+- 성별 및 학생 신분에 따른 지원 가능 기숙사 확인
+- 기숙사 배정 점수 자동 계산
+- 6개 기숙사 상세 정보 제공
+- 반응형 디자인으로 모바일/데스크톱 지원
 
-There are several ways of editing your application.
+## 🔧 데이터 관리 가이드
 
-**Use Lovable**
+### 학기별 데이터 업데이트
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
+매 학기 시작 전에 다음 파일들을 업데이트해야 합니다:
 
-Changes made via Lovable will be committed automatically to this repo.
+#### 1. `src/data/dormInfo.ts`
+- **수정 대상**: 기숙사별 수용 인원(TO), 공지사항
+- **수정 시기**: 학기 시작 전
+- **수정 방법**:
+  ```typescript
+  export const CURRENT_SEMESTER = "2026-1학기"; // 현재 학기로 변경
+  
+  export const dormCapacities: Record<string, DormCapacityInfo> = {
+    namje: {
+      capacity: "약 400명", // TO 변경 시 수정
+      note: `(${CURRENT_SEMESTER} 기준)`
+    },
+    // ... 나머지 기숙사
+  };
+  ```
 
-**Use your preferred IDE**
+#### 2. `src/data/dormitoryData.ts`
+- **수정 대상**: 기숙사 기본 정보, 지원 자격
+- **수정 시기**: 정책 변경 시
+- **주의사항**: 
+  - `getEligibleDormitories` 함수에서 지원 자격 로직 수정
+  - 기숙사 설명, 특징 등 변경 가능
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+### 기숙사 정보 구조
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+```typescript
+{
+  id: "namje",
+  name: "남제관",
+  tags: ["#재학생전용", "#남성전용"],
+  capacity: dormCapacities.namje.capacity,  // dormInfo.ts에서 가져옴
+  capacityNote: dormCapacities.namje.note,   // 학기 정보 자동 표시
+  notices: dormNotices.namje,                // 공지사항 (선택)
+  // ...
+}
+```
 
-Follow these steps:
+## 🚀 개발 시작하기
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+### 필수 요구사항
+- Node.js 18+ 
+- npm 또는 bun
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+### 설치 및 실행
 
-# Step 3: Install the necessary dependencies.
-npm i
+```bash
+# 저장소 클론
+git clone https://github.com/sinsangwoo/ajou-dorm-finder.git
+cd ajou-dorm-finder
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
+# 의존성 설치
+npm install
+
+# 개발 서버 실행
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+## 📂 프로젝트 구조
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+```
+src/
+├── data/
+│   ├── dormInfo.ts          # 학기별 변경 데이터 (TO, 공지사항)
+│   └── dormitoryData.ts     # 기숙사 기본 데이터
+├── components/
+│   ├── HeroSection.tsx      # 메인 페이지
+│   ├── EligibilityResult.tsx # 지원 가능 기숙사 표시
+│   ├── DormitoryCards.tsx   # 기숙사 카드 목록
+│   └── ScoreCalculator.tsx  # 점수 계산기
+└── pages/
+    └── Index.tsx            # 메인 페이지
+```
 
-**Use GitHub Codespaces**
+## 📝 기여하기
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+1. Fork the Project
+2. Create your Feature Branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your Changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the Branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
 
-## What technologies are used for this project?
+## ⚠️ 주의사항
 
-This project is built with:
+- 본 사이트는 비공식 정보 제공 목적입니다
+- 정확한 정보는 아주대학교 공식 홈페이지를 참고하세요
+- 기숙사 정책은 학기별로 변경될 수 있습니다
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+## 📄 라이선스
 
-## How can I deploy this project?
+This project is licensed under the MIT License.
 
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
+## 🔗 관련 링크
 
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+- [아주대학교 공식 홈페이지](https://www.ajou.ac.kr)
+- [아주대학교 생활관(기숙사)](https://dorm.ajou.ac.kr)

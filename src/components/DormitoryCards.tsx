@@ -1,6 +1,6 @@
 import { dormitories } from "@/data/dormitoryData";
 import { Badge } from "@/components/ui/badge";
-import { Building, Users, DoorOpen } from "lucide-react";
+import { Building, Users, DoorOpen, AlertCircle } from "lucide-react";
 
 const DormitoryCards = () => {
   return (
@@ -46,10 +46,26 @@ const DormitoryCards = () => {
 
               <p className="text-sm text-muted-foreground mb-4">{dorm.description}</p>
 
+              {dorm.notices && dorm.notices.length > 0 && (
+                <div className="mb-4 p-3 bg-orange-50 dark:bg-orange-950/30 rounded-lg border border-orange-200 dark:border-orange-800">
+                  {dorm.notices.map((notice, idx) => (
+                    <div key={idx} className="flex items-start gap-2 text-xs text-orange-800 dark:text-orange-200">
+                      <AlertCircle className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+                      <span>{notice}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
               <div className="flex items-center gap-4 text-xs text-muted-foreground border-t border-border pt-4">
                 <div className="flex items-center gap-1">
                   <Users className="w-3.5 h-3.5" />
-                  {dorm.capacity}
+                  <span>
+                    {dorm.capacity}
+                    {dorm.capacityNote && (
+                      <span className="ml-1 text-[10px]">{dorm.capacityNote}</span>
+                    )}
+                  </span>
                 </div>
                 <div className="flex items-center gap-1">
                   <DoorOpen className="w-3.5 h-3.5" />
