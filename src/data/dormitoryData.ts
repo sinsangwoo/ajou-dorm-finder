@@ -1,3 +1,5 @@
+import { dormCapacities, dormNotices } from "./dormInfo";
+
 export type Gender = "male" | "female";
 
 export type StudentType =
@@ -23,8 +25,10 @@ export interface Dormitory {
   competitionBadge?: string;
   description: string;
   capacity: string;
+  capacityNote?: string;
   roomType: string;
   features: string[];
+  notices?: string[];
 }
 
 export const studentTypes: { type: StudentType; label: string }[] = [
@@ -42,12 +46,18 @@ export const dormitories: Dormitory[] = [
     id: "namje",
     name: "남제관",
     nameEn: "Namje Hall",
-    tags: ["#학부전용", "#남성전용"],
-    competitionBadge: "신입생 경쟁 치열",
-    description: "학부 남학생 및 외국인 남학생이 거주할 수 있는 기숙사입니다.",
-    capacity: "약 400명",
-    roomType: "2인실",
-    features: ["학부 남학생 전용", "외국인 남학생 입주 가능", "캠퍼스 내 위치"],
+    tags: ["#재학생전용", "#남성전용", "#구축건물"],
+    description: "학부 재학생 남학생 및 외국인 남학생이 거주할 수 있는 기숙사입니다.",
+    capacity: dormCapacities.namje.capacity,
+    capacityNote: dormCapacities.namje.note,
+    roomType: "2인실, 4인실 (4인실 위주)",
+    features: [
+      "학부 재학생 남학생 전용 (신입생 지원 불가)",
+      "외국인 남학생 입주 가능",
+      "구축 건물로 시설이 오래됨",
+      "4인실이 대부분을 차지함"
+    ],
+    notices: dormNotices.namje,
   },
   {
     id: "yongji",
@@ -55,7 +65,8 @@ export const dormitories: Dormitory[] = [
     nameEn: "Yongji Hall",
     tags: ["#대학원가능", "#남성전용"],
     description: "학부 및 대학원 남학생이 거주할 수 있는 기숙사입니다.",
-    capacity: "약 350명",
+    capacity: dormCapacities.yongji.capacity,
+    capacityNote: dormCapacities.yongji.note,
     roomType: "2인실",
     features: ["학부 남학생", "일반/특수대학원 남학생", "캠퍼스 인근"],
   },
@@ -65,7 +76,8 @@ export const dormitories: Dormitory[] = [
     nameEn: "Hwahong Hall",
     tags: ["#외국인전용", "#남녀공용"],
     description: "외국인 학생 전용 기숙사입니다.",
-    capacity: "약 200명",
+    capacity: dormCapacities.hwahong.capacity,
+    capacityNote: dormCapacities.hwahong.note,
     roomType: "2인실",
     features: ["외국인 전용", "남녀 모두 입주 가능", "국제교류 활성화"],
   },
@@ -75,7 +87,8 @@ export const dormitories: Dormitory[] = [
     nameEn: "Gwanggyo Hall",
     tags: ["#여성전용", "#신축"],
     description: "학부 여학생, 간호대 여학생, 대학원 여학생이 거주할 수 있습니다.",
-    capacity: "약 450명",
+    capacity: dormCapacities.gwanggyo.capacity,
+    capacityNote: dormCapacities.gwanggyo.note,
     roomType: "2인실 / 4인실",
     features: ["학부 여학생", "간호대 여학생", "대학원 여학생", "신축 건물"],
   },
@@ -86,7 +99,8 @@ export const dormitories: Dormitory[] = [
     tags: ["#남녀공용", "#다양한대상"],
     competitionBadge: "다양한 지원자",
     description: "학부생, 외국인, 일반대학원생이 거주할 수 있는 기숙사입니다.",
-    capacity: "약 500명",
+    capacity: dormCapacities.international.capacity,
+    capacityNote: dormCapacities.international.note,
     roomType: "2인실",
     features: ["학부생 (남/여)", "외국인 (남/여)", "일반대학원 (남/여)"],
   },
@@ -96,7 +110,8 @@ export const dormitories: Dormitory[] = [
     nameEn: "Ilsin Hall",
     tags: ["#남녀공용", "#전문대학원"],
     description: "학부생 및 전문대학원생이 거주할 수 있는 기숙사입니다.",
-    capacity: "약 300명",
+    capacity: dormCapacities.ilsin.capacity,
+    capacityNote: dormCapacities.ilsin.note,
     roomType: "1인실 / 2인실",
     features: ["학부생 (남/여)", "법학전문대학원", "의대", "간호대"],
   },
@@ -109,10 +124,10 @@ export function getEligibleDormitories(
 ): string[] {
   const eligible: string[] = [];
 
-  // 남제관: Undergraduate Male, Foreigner Male
+  // 남제관: Enrolled Male, Foreigner Male (신입생 지원 불가)
   if (
     gender === "male" &&
-    (type === "freshman" || type === "enrolled" || type === "foreigner")
+    (type === "enrolled" || type === "foreigner")
   ) {
     eligible.push("namje");
   }
