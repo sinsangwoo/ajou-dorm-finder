@@ -1,0 +1,242 @@
+import { useState, useMemo } from "react";
+import { Slider } from "@/components/ui/slider";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+import { Calculator, TrendingUp } from "lucide-react";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  Cell,
+} from "recharts";
+import {
+  gradeScoreMap,
+  getGradeScore,
+  distanceRegions,
+  getDistanceScore,
+} from "@/data/dormitoryData";
+
+const chartData = gradeScoreMap.map((entry) => ({
+  name: entry.label,
+  score: entry.score,
+}));
+
+const allRegions = distanceRegions.flatMap((d) =>
+  d.regions.map((r) => ({ name: r, points: d.points }))
+);
+
+const ScoreCalculator = () => {
+  const [gpa, setGpa] = useState(3.5);
+  const [isPreviousResident, setIsPreviousResident] = useState(false);
+  const [selectedRegion, setSelectedRegion] = useState("");
+  const [volunteer, setVolunteer] = useState(0);
+  const [education, setEducation] = useState(0);
+
+  const gradeScore = useMemo(() => getGradeScore(gpa), [gpa]);
+  const distanceScore = useMemo(
+    () => (isPreviousResident ? 30 : getDistanceScore(selectedRegion)),
+    [isPreviousResident, selectedRegion]
+  );
+  const totalScore = gradeScore + distanceScore + volunteer + education;
+
+  const getScoreColor = (score: number) => {
+    if (score >= 80) return "text-success";
+    if (score >= 60) return "text-primary";
+    if (score >= 40) return "text-warning";
+    return "text-destructive";
+  };
+
+  return (
+    <section id="calculator" className="py-16 md:py-24 gradient-ajou-subtle">
+      <div className="container mx-auto px-4">
+        <div className="text-center mb-12">
+          <div className="inline-flex items-center gap-2 text-primary mb-4">
+            <Calculator className="w-5 h-5" />
+            <span className="text-sm font-medium">재학생 전용</span>
+          </div>
+          <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-2">
+            점수 계산기
+          </h2>
+          <p className="text-muted-foreground">나의 기숙사 배정 점수를 미리 확인하세요</p>
+        </div>
+
+        <div className="max-w-4xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {/* Input Section */}
+          <div className="space-y-8">
+            {/* GPA */}
+            <div className="glass-card-strong rounded-2xl p-6">
+              <div className="flex items-center justify-between mb-4">
+                <Label className="text-base font-semibold">학점 (GPA)</Label>
+                <Badge variant="secondary" className="text-lg font-bold px-3">
+                  {gpa.toFixed(2)}
+                </Badge>
+              </div>
+              <Slider
+                value={[gpa]}
+                onValueChange={([v]) => setGpa(v)}
+                min={0}
+                max={4.5}
+                step={0.01}
+                className="mb-2"
+              />
+              <div className="flex justify-between text-xs text-muted-foreground">
+                <span>0.00</span>
+                <span>4.50</span>
+              </div>
+              <p className="mt-3 text-sm">
+                학점 점수:{" "}
+                <span className="font-bold text-primary">{gradeScore}점</span>
+                <span className="text-muted-foreground"> / 60점</span>
+              </p>
+            </div>
+
+            {/* Distance / Dorm Point */}
+            <div className="glass-card-strong rounded-2xl p-6">
+              <Label className="text-base font-semibold mb-4 block">
+                거리 / 기숙사 포인트
+              </Label>
+              <div className="flex items-center gap-3 mb-4">
+                <Switch
+                  checked={isPreviousResident}
+                  onCheckedChange={setIsPreviousResident}
+                />
+                <span className="text-sm">기존 기숙사 거주자입니다</span>
+              </div>
+              {!isPreviousResident && (
+                <Select value={selectedRegion} onValueChange={setSelectedRegion}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="거주 지역을 선택하세요" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {distanceRegions.map((group) => (
+                      <div key={group.category}>
+                        <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground">
+                          {group.category}
+                        </div>
+                        {group.regions.map((r) => (
+                          <SelectItem key={r} value={r}>
+                            {r}
+                          </SelectItem>
+                        ))}
+                      </div>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+              <p className="mt-3 text-sm">
+                거리/기숙사 점수:{" "}
+                <span className="font-bold text-primary">{distanceScore}점</span>
+                <span className="text-muted-foreground"> / 30점</span>
+              </p>
+            </div>
+
+            {/* Volunteer & Education */}
+            <div className="glass-card-strong rounded-2xl p-6 space-y-6">
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <Label className="text-sm font-semibold">봉사활동 포인트</Label>
+                  <span className="text-sm font-bold text-primary">{volunteer}점</span>
+                </div>
+                <Slider
+                  value={[volunteer]}
+                  onValueChange={([v]) => setVolunteer(v)}
+                  min={0}
+                  max={5}
+                  step={1}
+                />
+              </div>
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <Label className="text-sm font-semibold">필수교육 포인트</Label>
+                  <span className="text-sm font-bold text-primary">{education}점</span>
+                </div>
+                <Slider
+                  value={[education]}
+                  onValueChange={([v]) => setEducation(v)}
+                  min={0}
+                  max={5}
+                  step={1}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Results & Chart */}
+          <div className="space-y-8">
+            {/* Total Score */}
+            <div className="glass-card-strong rounded-2xl p-8 text-center">
+              <TrendingUp className="w-8 h-8 text-primary mx-auto mb-3" />
+              <p className="text-sm text-muted-foreground mb-2">예상 총점</p>
+              <p className={`text-6xl font-bold mb-2 ${getScoreColor(totalScore)}`}>
+                {totalScore}
+              </p>
+              <p className="text-muted-foreground text-sm">/ 100점</p>
+              <div className="mt-6 grid grid-cols-2 gap-3 text-left">
+                <div className="bg-muted/50 rounded-lg p-3">
+                  <p className="text-xs text-muted-foreground">학점</p>
+                  <p className="text-lg font-bold">{gradeScore}<span className="text-xs text-muted-foreground">/60</span></p>
+                </div>
+                <div className="bg-muted/50 rounded-lg p-3">
+                  <p className="text-xs text-muted-foreground">거리/기숙사</p>
+                  <p className="text-lg font-bold">{distanceScore}<span className="text-xs text-muted-foreground">/30</span></p>
+                </div>
+                <div className="bg-muted/50 rounded-lg p-3">
+                  <p className="text-xs text-muted-foreground">봉사활동</p>
+                  <p className="text-lg font-bold">{volunteer}<span className="text-xs text-muted-foreground">/5</span></p>
+                </div>
+                <div className="bg-muted/50 rounded-lg p-3">
+                  <p className="text-xs text-muted-foreground">필수교육</p>
+                  <p className="text-lg font-bold">{education}<span className="text-xs text-muted-foreground">/5</span></p>
+                </div>
+              </div>
+            </div>
+
+            {/* Chart */}
+            <div className="glass-card-strong rounded-2xl p-6">
+              <h3 className="text-sm font-semibold mb-4">학점 ↔ 점수 매핑 차트</h3>
+              <ResponsiveContainer width="100%" height={250}>
+                <BarChart data={chartData} layout="vertical" margin={{ left: 20 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(213 20% 90%)" />
+                  <XAxis type="number" domain={[0, 60]} tick={{ fontSize: 12 }} />
+                  <YAxis
+                    type="category"
+                    dataKey="name"
+                    tick={{ fontSize: 10 }}
+                    width={80}
+                  />
+                  <Tooltip
+                    contentStyle={{
+                      borderRadius: "12px",
+                      border: "none",
+                      boxShadow: "0 4px 20px rgba(0,0,0,0.1)",
+                    }}
+                  />
+                  <Bar dataKey="score" radius={[0, 6, 6, 0]}>
+                    {chartData.map((entry, index) => (
+                      <Cell
+                        key={index}
+                        fill={
+                          entry.score === gradeScore
+                            ? "hsl(213, 100%, 30%)"
+                            : "hsl(213, 30%, 80%)"
+                        }
+                      />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+};
+
+export default ScoreCalculator;
