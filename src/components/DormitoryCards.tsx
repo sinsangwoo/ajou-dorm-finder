@@ -1,8 +1,7 @@
 import { dormitories } from "@/data/dormitoryData";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Building, Users, DoorOpen, AlertCircle, ExternalLink } from "lucide-react";
-import { DORM_HOMEPAGE, getRoomTypePercentage } from "@/data/dormInfo";
+import { Building, Users, DoorOpen, AlertCircle } from "lucide-react";
+import { getRoomTypePercentage } from "@/data/dormInfo";
 
 const DormitoryCards = () => {
   return (
@@ -143,16 +142,6 @@ const DormitoryCards = () => {
                   </div>
                 </div>
 
-                {/* 공식 홈페이지 바로가기 버튼 */}
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  className="w-full text-xs"
-                  onClick={() => window.open(DORM_HOMEPAGE, '_blank')}
-                >
-                  <ExternalLink className="w-3 h-3 mr-1" />
-                  공식 홈페이지 바로가기
-                </Button>
               </div>
             );
           })}

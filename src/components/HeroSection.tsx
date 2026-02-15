@@ -63,7 +63,7 @@ const HeroSection = ({ onCategorySelect }: HeroSectionProps) => {
         {selectedGender && (
           <div className="w-full max-w-2xl animate-fade-in-up" style={{ animationDelay: "0.2s" }}>
             <p className="text-white/60 text-sm text-center mb-4">신분을 선택해 주세요</p>
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               {studentTypes.map(({ type, label }) => (
                 <button
                   key={type}
@@ -80,7 +80,7 @@ const HeroSection = ({ onCategorySelect }: HeroSectionProps) => {
         )}
 
         {/* Scroll indicator */}
-        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center text-white/40 animate-bounce">
+        <div className="absolute bottom-8 left-0 right-0 flex flex-col items-center text-white/40 animate-bounce">
           <span className="text-xs mb-1">아래로 스크롤</span>
           <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
             <path d="M10 14l-5-5h10l-5 5z" />
