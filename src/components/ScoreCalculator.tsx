@@ -6,30 +6,16 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Calculator, TrendingUp } from "lucide-react";
 import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  Cell,
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,
 } from "recharts";
 import {
-  gradeScoreMap,
-  getGradeScore,
-  distanceRegions,
-  getDistanceScore,
+  gradeScoreMap, getGradeScore, distanceRegions, getDistanceScore,
 } from "@/data/dormitoryData";
 
 const chartData = gradeScoreMap.map((entry) => ({
   name: entry.label,
   score: entry.score,
 }));
-
-const allRegions = distanceRegions.flatMap((d) =>
-  d.regions.map((r) => ({ name: r, points: d.points }))
-);
 
 const ScoreCalculator = () => {
   const [gpa, setGpa] = useState(3.5);
@@ -53,14 +39,14 @@ const ScoreCalculator = () => {
   };
 
   return (
-    <section id="calculator" className="py-16 md:py-24 gradient-ajou-subtle">
+    <section id="calculator" className="section-padding gradient-ajou-subtle">
       <div className="container mx-auto px-4">
-        <div className="text-center mb-12">
+        <div className="text-center mb-14">
           <div className="inline-flex items-center gap-2 text-primary mb-4">
             <Calculator className="w-5 h-5" />
-            <span className="text-sm font-medium">재학생 전용</span>
+            <span className="text-sm font-medium tracking-wide">재학생 전용</span>
           </div>
-          <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-2">
+          <h2 className="text-3xl md:text-4xl font-extrabold text-foreground mb-3 tracking-tight">
             점수 계산기
           </h2>
           <p className="text-muted-foreground">나의 기숙사 배정 점수를 미리 확인하세요</p>
@@ -68,12 +54,12 @@ const ScoreCalculator = () => {
 
         <div className="max-w-4xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* Input Section */}
-          <div className="space-y-8">
+          <div className="space-y-6">
             {/* GPA */}
             <div className="glass-card-strong rounded-2xl p-6">
               <div className="flex items-center justify-between mb-4">
-                <Label className="text-base font-semibold">학점 (GPA)</Label>
-                <Badge variant="secondary" className="text-lg font-bold px-3">
+                <Label className="text-base font-semibold tracking-tight">학점 (GPA)</Label>
+                <Badge variant="secondary" className="text-lg font-bold px-3 tabular-nums">
                   {gpa.toFixed(2)}
                 </Badge>
               </div>
@@ -85,20 +71,20 @@ const ScoreCalculator = () => {
                 step={0.01}
                 className="mb-2"
               />
-              <div className="flex justify-between text-xs text-muted-foreground">
+              <div className="flex justify-between text-[11px] text-muted-foreground/60">
                 <span>0.00</span>
                 <span>4.50</span>
               </div>
               <p className="mt-3 text-sm">
                 학점 점수:{" "}
-                <span className="font-bold text-primary">{gradeScore}점</span>
-                <span className="text-muted-foreground"> / 60점</span>
+                <span className="font-bold text-primary tabular-nums">{gradeScore}점</span>
+                <span className="text-muted-foreground/60"> / 60점</span>
               </p>
             </div>
 
             {/* Distance / Dorm Point */}
             <div className="glass-card-strong rounded-2xl p-6">
-              <Label className="text-base font-semibold mb-4 block">
+              <Label className="text-base font-semibold mb-4 block tracking-tight">
                 거리 / 기숙사 포인트
               </Label>
               <div className="flex items-center gap-3 mb-4">
@@ -131,8 +117,8 @@ const ScoreCalculator = () => {
               )}
               <p className="mt-3 text-sm">
                 거리/기숙사 점수:{" "}
-                <span className="font-bold text-primary">{distanceScore}점</span>
-                <span className="text-muted-foreground"> / 30점</span>
+                <span className="font-bold text-primary tabular-nums">{distanceScore}점</span>
+                <span className="text-muted-foreground/60"> / 30점</span>
               </p>
             </div>
 
@@ -141,7 +127,7 @@ const ScoreCalculator = () => {
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <Label className="text-sm font-semibold">봉사활동 포인트</Label>
-                  <span className="text-sm font-bold text-primary">{volunteer}점</span>
+                  <span className="text-sm font-bold text-primary tabular-nums">{volunteer}점</span>
                 </div>
                 <Slider
                   value={[volunteer]}
@@ -154,7 +140,7 @@ const ScoreCalculator = () => {
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <Label className="text-sm font-semibold">필수교육 포인트</Label>
-                  <span className="text-sm font-bold text-primary">{education}점</span>
+                  <span className="text-sm font-bold text-primary tabular-nums">{education}점</span>
                 </div>
                 <Slider
                   value={[education]}
@@ -168,53 +154,44 @@ const ScoreCalculator = () => {
           </div>
 
           {/* Results & Chart */}
-          <div className="space-y-8">
+          <div className="space-y-6">
             {/* Total Score */}
-            <div className="glass-card-strong rounded-2xl p-8 text-center">
-              <TrendingUp className="w-8 h-8 text-primary mx-auto mb-3" />
-              <p className="text-sm text-muted-foreground mb-2">예상 총점</p>
-              <p className={`text-6xl font-bold mb-2 ${getScoreColor(totalScore)}`}>
+            <div className="glass-card-strong rounded-2xl p-8 text-center premium-glow">
+              <TrendingUp className="w-7 h-7 text-primary mx-auto mb-3" />
+              <p className="text-xs text-muted-foreground/60 mb-2 uppercase tracking-widest font-medium">예상 총점</p>
+              <p className={`text-6xl font-extrabold mb-1 tabular-nums tracking-tighter ${getScoreColor(totalScore)}`}>
                 {totalScore}
               </p>
-              <p className="text-muted-foreground text-sm">/ 100점</p>
+              <p className="text-muted-foreground/50 text-sm">/ 100점</p>
               <div className="mt-6 grid grid-cols-2 gap-3 text-left">
-                <div className="bg-muted/50 rounded-lg p-3">
-                  <p className="text-xs text-muted-foreground">학점</p>
-                  <p className="text-lg font-bold">{gradeScore}<span className="text-xs text-muted-foreground">/60</span></p>
-                </div>
-                <div className="bg-muted/50 rounded-lg p-3">
-                  <p className="text-xs text-muted-foreground">거리/기숙사</p>
-                  <p className="text-lg font-bold">{distanceScore}<span className="text-xs text-muted-foreground">/30</span></p>
-                </div>
-                <div className="bg-muted/50 rounded-lg p-3">
-                  <p className="text-xs text-muted-foreground">봉사활동</p>
-                  <p className="text-lg font-bold">{volunteer}<span className="text-xs text-muted-foreground">/5</span></p>
-                </div>
-                <div className="bg-muted/50 rounded-lg p-3">
-                  <p className="text-xs text-muted-foreground">필수교육</p>
-                  <p className="text-lg font-bold">{education}<span className="text-xs text-muted-foreground">/5</span></p>
-                </div>
+                {[
+                  { label: "학점", value: gradeScore, max: 60 },
+                  { label: "거리/기숙사", value: distanceScore, max: 30 },
+                  { label: "봉사활동", value: volunteer, max: 5 },
+                  { label: "필수교육", value: education, max: 5 },
+                ].map((item) => (
+                  <div key={item.label} className="bg-muted/40 rounded-xl p-3">
+                    <p className="text-[11px] text-muted-foreground/60">{item.label}</p>
+                    <p className="text-lg font-bold tabular-nums tracking-tight">{item.value}<span className="text-[11px] text-muted-foreground/40">/{item.max}</span></p>
+                  </div>
+                ))}
               </div>
             </div>
 
             {/* Chart */}
             <div className="glass-card-strong rounded-2xl p-6">
-              <h3 className="text-sm font-semibold mb-4">학점 ↔ 점수 매핑 차트</h3>
+              <h3 className="text-sm font-semibold mb-4 tracking-tight">학점 ↔ 점수 매핑 차트</h3>
               <ResponsiveContainer width="100%" height={250}>
                 <BarChart data={chartData} layout="vertical" margin={{ left: 20 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(213 20% 90%)" />
-                  <XAxis type="number" domain={[0, 60]} tick={{ fontSize: 12 }} />
-                  <YAxis
-                    type="category"
-                    dataKey="name"
-                    tick={{ fontSize: 10 }}
-                    width={80}
-                  />
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(213 20% 92%)" />
+                  <XAxis type="number" domain={[0, 60]} tick={{ fontSize: 11 }} />
+                  <YAxis type="category" dataKey="name" tick={{ fontSize: 10 }} width={80} />
                   <Tooltip
                     contentStyle={{
                       borderRadius: "12px",
-                      border: "none",
-                      boxShadow: "0 4px 20px rgba(0,0,0,0.1)",
+                      border: "1px solid hsl(213 15% 91%)",
+                      boxShadow: "0 4px 20px rgba(0,0,0,0.06)",
+                      fontSize: "13px",
                     }}
                   />
                   <Bar dataKey="score" radius={[0, 6, 6, 0]}>
@@ -224,7 +201,7 @@ const ScoreCalculator = () => {
                         fill={
                           entry.score === gradeScore
                             ? "hsl(213, 100%, 30%)"
-                            : "hsl(213, 30%, 80%)"
+                            : "hsl(213, 20%, 86%)"
                         }
                       />
                     ))}
