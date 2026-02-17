@@ -49,11 +49,15 @@
     --sidebar-border: 213 20% 90%;
     --sidebar-ring: 213 100% 30%;
 
-    /* Premium tokens */
+    /* Premium shadow tokens */
     --shadow-soft: 0 1px 3px 0 rgb(0 0 0 / 0.04), 0 4px 12px 0 rgb(0 0 0 / 0.03);
     --shadow-card: 0 2px 8px -2px rgb(0 0 0 / 0.06), 0 8px 24px -4px rgb(0 0 0 / 0.04);
     --shadow-card-hover: 0 4px 16px -4px rgb(0 0 0 / 0.1), 0 12px 36px -8px rgb(0 0 0 / 0.06);
     --shadow-glow: 0 0 20px -4px hsl(213 100% 30% / 0.15);
+    --shadow-nav: 0 1px 0 0 hsl(213 15% 91%), 0 4px 16px -4px rgb(0 0 0 / 0.06);
+
+    /* Nav height token — used by layout to offset content */
+    --nav-height: 64px;
   }
 
   .dark {
@@ -104,12 +108,19 @@
     --shadow-card: 0 2px 8px -2px rgb(0 0 0 / 0.2), 0 8px 24px -4px rgb(0 0 0 / 0.12);
     --shadow-card-hover: 0 4px 16px -4px rgb(0 0 0 / 0.3), 0 12px 36px -8px rgb(0 0 0 / 0.15);
     --shadow-glow: 0 0 20px -4px hsl(213 80% 55% / 0.2);
+    --shadow-nav: 0 1px 0 0 hsl(213 30% 18%), 0 4px 16px -4px rgb(0 0 0 / 0.2);
   }
 }
 
 @layer base {
   * {
     @apply border-border;
+  }
+
+  html {
+    scroll-behavior: smooth;
+    /* Reserve space for fixed navbar */
+    scroll-padding-top: var(--nav-height);
   }
 
   body {
@@ -129,13 +140,14 @@
 }
 
 @layer components {
+  /* ─── Glass Cards ─────────────────────────────── */
   .glass-card {
     @apply bg-white/70 dark:bg-white/10 backdrop-blur-xl border border-white/30 dark:border-white/10;
     box-shadow: var(--shadow-card);
   }
 
   .glass-card-strong {
-    @apply bg-white/90 dark:bg-white/15 backdrop-blur-2xl border border-border/60 dark:border-white/15;
+    @apply bg-white/90 dark:bg-white/[0.07] backdrop-blur-2xl border border-border/60 dark:border-white/[0.08];
     box-shadow: var(--shadow-card);
     transition: box-shadow 0.3s ease, transform 0.3s ease;
   }
@@ -144,18 +156,32 @@
     box-shadow: var(--shadow-card-hover);
   }
 
+  /* ─── Gradients ───────────────────────────────── */
   .gradient-ajou {
-    background: linear-gradient(135deg, hsl(213 100% 25%) 0%, hsl(213 85% 38%) 50%, hsl(205 75% 48%) 100%);
+    background: linear-gradient(135deg,
+      hsl(213 100% 22%) 0%,
+      hsl(213 90% 33%) 45%,
+      hsl(205 78% 46%) 100%
+    );
   }
 
   .gradient-ajou-subtle {
-    background: linear-gradient(135deg, hsl(213 100% 30% / 0.03) 0%, hsl(213 80% 45% / 0.06) 100%);
+    background: linear-gradient(135deg,
+      hsl(213 100% 30% / 0.03) 0%,
+      hsl(213 80% 45% / 0.06) 100%
+    );
   }
 
+  /* ─── Layout helpers ──────────────────────────── */
   .section-padding {
-    @apply py-20 md:py-28;
+    @apply py-16 md:py-24;
   }
 
+  .page-top {
+    padding-top: var(--nav-height);
+  }
+
+  /* ─── Effects ─────────────────────────────────── */
   .premium-glow {
     box-shadow: var(--shadow-glow);
   }
@@ -167,5 +193,78 @@
   .hover-lift:hover {
     transform: translateY(-4px);
     box-shadow: var(--shadow-card-hover);
+  }
+
+  /* ─── Navbar ──────────────────────────────────── */
+  .navbar {
+    height: var(--nav-height);
+    @apply fixed top-0 left-0 right-0 z-50;
+    @apply bg-background/80 backdrop-blur-xl;
+    box-shadow: var(--shadow-nav);
+    transition: background-color 0.3s ease, box-shadow 0.3s ease, transform 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .navbar.hidden-up {
+    transform: translateY(-100%);
+  }
+
+  .navbar.on-hero {
+    @apply bg-transparent;
+    box-shadow: none;
+  }
+
+  /* ─── Stagger animation helpers ───────────────── */
+  .stagger-1 { animation-delay: 0.05s; }
+  .stagger-2 { animation-delay: 0.10s; }
+  .stagger-3 { animation-delay: 0.15s; }
+  .stagger-4 { animation-delay: 0.20s; }
+  .stagger-5 { animation-delay: 0.25s; }
+  .stagger-6 { animation-delay: 0.30s; }
+
+  /* ─── Shimmer skeleton ────────────────────────── */
+  .shimmer {
+    background: linear-gradient(
+      90deg,
+      hsl(var(--muted)) 25%,
+      hsl(var(--accent) / 0.3) 50%,
+      hsl(var(--muted)) 75%
+    );
+    background-size: 200% 100%;
+    @apply animate-shimmer;
+  }
+
+  /* ─── Active nav link ─────────────────────────── */
+  .nav-link {
+    @apply relative text-sm font-medium text-muted-foreground transition-colors duration-200;
+  }
+
+  .nav-link::after {
+    content: "";
+    @apply absolute bottom-0 left-0 right-0 h-0.5 rounded-full bg-primary scale-x-0 transition-transform duration-200;
+    transform-origin: center;
+  }
+
+  .nav-link:hover,
+  .nav-link.active {
+    @apply text-foreground;
+  }
+
+  .nav-link.active::after {
+    @apply scale-x-100;
+  }
+
+  /* ─── Filter toggle pills ─────────────────────── */
+  .filter-pill {
+    @apply inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-sm font-medium;
+    @apply border border-border transition-all duration-200 cursor-pointer;
+    @apply text-muted-foreground bg-transparent;
+  }
+
+  .filter-pill:hover {
+    @apply border-primary/40 text-foreground bg-primary/[0.04];
+  }
+
+  .filter-pill.active {
+    @apply border-primary/60 text-primary bg-primary/[0.08];
   }
 }
