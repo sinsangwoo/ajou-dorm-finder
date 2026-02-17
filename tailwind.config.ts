@@ -13,6 +13,20 @@ export default {
       },
     },
     extend: {
+      fontSize: {
+        "2xs": ["0.625rem", { lineHeight: "1rem" }],    // 10px
+        xs:   ["0.6875rem", { lineHeight: "1.125rem" }], // 11px
+        sm:   ["0.8125rem", { lineHeight: "1.375rem" }], // 13px
+        base: ["0.9375rem", { lineHeight: "1.6rem" }],   // 15px
+        lg:   ["1.0625rem", { lineHeight: "1.75rem" }],  // 17px
+        xl:   ["1.1875rem", { lineHeight: "1.875rem" }], // 19px
+        "2xl":["1.375rem",  { lineHeight: "2rem" }],     // 22px
+        "3xl":["1.75rem",   { lineHeight: "2.25rem" }],  // 28px
+        "4xl":["2.25rem",   { lineHeight: "2.75rem" }],  // 36px
+        "5xl":["3rem",      { lineHeight: "1.1" }],      // 48px
+        "6xl":["3.75rem",   { lineHeight: "1.05" }],     // 60px
+        "7xl":["4.5rem",    { lineHeight: "1" }],        // 72px
+      },
       colors: {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
@@ -80,14 +94,49 @@ export default {
           to: { height: "0" },
         },
         "fade-in-up": {
-          from: { opacity: "0", transform: "translateY(20px)" },
+          from: { opacity: "0", transform: "translateY(24px)" },
           to: { opacity: "1", transform: "translateY(0)" },
+        },
+        "fade-in": {
+          from: { opacity: "0" },
+          to: { opacity: "1" },
+        },
+        "slide-down": {
+          from: { opacity: "0", transform: "translateY(-12px)" },
+          to: { opacity: "1", transform: "translateY(0)" },
+        },
+        "slide-up-fade": {
+          from: { opacity: "0", transform: "translateY(12px)" },
+          to: { opacity: "1", transform: "translateY(0)" },
+        },
+        "scale-in": {
+          from: { opacity: "0", transform: "scale(0.95)" },
+          to: { opacity: "1", transform: "scale(1)" },
+        },
+        "count-up": {
+          from: { opacity: "0", transform: "translateY(8px)" },
+          to: { opacity: "1", transform: "translateY(0)" },
+        },
+        shimmer: {
+          "0%": { backgroundPosition: "-200% 0" },
+          "100%": { backgroundPosition: "200% 0" },
         },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
-        "fade-in-up": "fade-in-up 0.5s ease-out forwards",
+        "fade-in-up": "fade-in-up 0.55s cubic-bezier(0.22, 1, 0.36, 1) forwards",
+        "fade-in": "fade-in 0.4s ease-out forwards",
+        "slide-down": "slide-down 0.35s cubic-bezier(0.22, 1, 0.36, 1) forwards",
+        "slide-up-fade": "slide-up-fade 0.4s cubic-bezier(0.22, 1, 0.36, 1) forwards",
+        "scale-in": "scale-in 0.3s cubic-bezier(0.22, 1, 0.36, 1) forwards",
+        shimmer: "shimmer 2.5s linear infinite",
+      },
+      transitionTimingFunction: {
+        spring: "cubic-bezier(0.22, 1, 0.36, 1)",
+      },
+      backdropBlur: {
+        xs: "2px",
       },
     },
   },
