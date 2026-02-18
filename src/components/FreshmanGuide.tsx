@@ -1,4 +1,4 @@
-import { GraduationCap, MapPin, Trophy, Info, ChevronDown, ChevronUp } from "lucide-react";
+import { GraduationCap, MapPin, Trophy, ChevronDown, ChevronUp } from "lucide-react";
 import { distanceRegions, tieBreakRules } from "@/data/dormitoryData";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
@@ -33,11 +33,10 @@ const selectionSteps = [
     step: "3순위",
     icon: GraduationCap,
     title: "입학성적순",
-    desc: "거리가 동일한 경우(예: 같은 아파트 등)에 한해 입학성적 순으로 선발됩니다. 수능 점수가 아닌 입학 성적 기준입니다.",
+    desc: "거리가 동일한 경우(예: 같은 아파트 등)에 한해 입학성적 순으로 선발됩니다.",
     color: "text-primary",
     bg: "bg-primary/[0.04]",
     border: "border-primary/20",
-    highlight: true,
   },
 ];
 
@@ -87,8 +86,7 @@ export default function FreshmanGuide() {
                 className={cn(
                   "relative rounded-2xl p-6 text-center border hover-lift",
                   item.bg,
-                  item.border,
-                  item.highlight && "ring-2 ring-primary/20"
+                  item.border
                 )}
               >
                 <div
@@ -112,27 +110,8 @@ export default function FreshmanGuide() {
                 <p className="text-xs text-muted-foreground leading-relaxed">
                   {item.desc}
                 </p>
-                {item.highlight && (
-                  <div className="mt-3 inline-flex items-center gap-1 text-xs text-primary font-medium bg-primary/10 px-2.5 py-1 rounded-full">
-                    <Info className="w-3 h-3" />
-                    수능 점수 아님
-                  </div>
-                )}
               </div>
             ))}
-          </div>
-        </div>
-
-        {/* ── 수정된 정보 강조 배너 ── */}
-        <div className="max-w-3xl mx-auto mb-10">
-          <div className="flex items-start gap-3 p-4 rounded-xl bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800/40">
-            <Info className="w-4 h-4 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
-            <p className="text-sm text-amber-800 dark:text-amber-300 leading-relaxed">
-              <span className="font-semibold">3순위는 수능 점수가 아닙니다.</span>{" "}
-              거리가 완전히 동일한 경우(예: 같은 아파트 거주)에만 적용되는{" "}
-              <span className="font-semibold">입학성적</span> 기준입니다.
-              공식 선발기준 문서 기준으로 작성되었습니다.
-            </p>
           </div>
         </div>
 
