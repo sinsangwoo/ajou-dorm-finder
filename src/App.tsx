@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Navbar from "@/components/Navbar";
 import Index from "./pages/Index";
 import DormsPage from "./pages/DormsPage";
+import DormDetailPage from "./pages/DormDetailPage";
 import CalculatorPage from "./pages/CalculatorPage";
 import NotFound from "./pages/NotFound";
 import { useTheme } from "@/hooks/useTheme";
@@ -21,11 +22,12 @@ function AppShell() {
     <>
       <Navbar />
       <Routes>
-        <Route path="/"            element={<Index />} />
-        <Route path="/dorms"       element={<DormsPage />} />
-        <Route path="/calculator"  element={<CalculatorPage />} />
+        <Route path="/"               element={<Index />} />
+        <Route path="/dorms"          element={<DormsPage />} />
+        <Route path="/dorms/:id"      element={<DormDetailPage />} />
+        <Route path="/calculator"     element={<CalculatorPage />} />
         {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-        <Route path="*"            element={<NotFound />} />
+        <Route path="*"               element={<NotFound />} />
       </Routes>
     </>
   );
