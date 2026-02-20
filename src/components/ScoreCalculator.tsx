@@ -1,4 +1,16 @@
-import { useState, useMemo, useId } from "react";
+/**
+ * ScoreCalculator.tsx
+ * ─────────────────────────────────────────────────────────────────────────────
+ * PRESENTATION LAYER ONLY.
+ * All state management and calculation logic lives in:
+ *   - src/hooks/useScoreCalculator.ts  (state + derived values)
+ *   - src/lib/calc/scoreEngine.ts      (pure calculation functions)
+ *
+ * This component renders the result of useScoreCalculator() with zero
+ * business logic of its own.
+ */
+
+import { useId } from "react";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
@@ -16,105 +28,50 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip as ReTooltip, ResponsiveContainer, Cell,
 } from "recharts";
-import {
-  gradeScoreMap, gradeScoreMapFinancial,
-  getGradeScore, distanceRegions, getDistanceScore,
-} from "@/data/dormitoryData";
+import { distanceRegions } from "@/data/dormitoryData";
+import { useScoreCalculator } from "@/hooks/useScoreCalculator";
 import { cn } from "@/lib/utils";
-
-// ── Score interpretation helper ──────────────────
-function getScoreLevel(score: number, isFinancial: boolean) {
-  // 가계곤란 최대 100점 동일, 일반 최대 100점 동일
-  if (isFinancial) {
-    if (score >= 85) return { label: "매우 유리", color: "text-success", bg: "bg-success/10" };
-    if (score >= 70) return { label: "유리", color: "text-primary", bg: "bg-primary/10" };
-    if (score >= 55) return { label: "보통", color: "text-warning", bg: "bg-warning/10" };
-    return { label: "경쟁 필요", color: "text-destructive", bg: "bg-destructive/10" };
-  }
-  if (score >= 85) return { label: "매우 유리", color: "text-success", bg: "bg-success/10" };
-  if (score >= 70) return { label: "유리", color: "text-primary", bg: "bg-primary/10" };
-  if (score >= 55) return { label: "보통", color: "text-warning", bg: "bg-warning/10" };
-  return { label: "경쟁 필요", color: "text-destructive", bg: "bg-destructive/10" };
-}
 
 export default function ScoreCalculator() {
   const gpaInputId = useId();
 
-  // ── Mode: 일반학생 vs 가계곤란학생
-  const [isFinancial, setIsFinancial] = useState(false);
+  // ── All state + derived values come from the hook ──
+  const {
+    isFinancial,
+    setMode,
+    gpa,
+    gpaInput,
+    handleGpaSlider,
+    handleGpaInput,
+    isPreviousResident,
+    setIsPreviousResident,
+    selectedRegion,
+    setSelectedRegion,
+    financialRawScore,
+    setFinancialRawScore,
+    volunteerRaw,
+    setVolunteerRaw,
+    educationRaw,
+    setEducationRaw,
+    breakdown,
+    levelInfo,
+    gradeMax,
+    chartData,
+  } = useScoreCalculator();
 
-  // ── GPA
-  const [gpa, setGpa] = useState(3.5);
-  const [gpaInput, setGpaInput] = useState("3.50");
-
-  const handleGpaSlider = (v: number) => {
-    setGpa(v);
-    setGpaInput(v.toFixed(2));
-  };
-  const handleGpaInput = (raw: string) => {
-    setGpaInput(raw);
-    const num = parseFloat(raw);
-    if (!isNaN(num) && num >= 0 && num <= 4.5) setGpa(num);
-  };
-
-  // ── Previous resident toggle (사생점수 30점)
-  const [isPreviousResident, setIsPreviousResident] = useState(false);
-
-  // ── Region
-  const [selectedRegion, setSelectedRegion] = useState("");
-
-  // ── Volunteer (봉사점수)
-  const [volunteer, setVolunteer] = useState(0);
-
-  // ── Mandatory education (법정필수교육)
-  const [education, setEducation] = useState(0);
-
-  // ── Scores
-  const gradeScore = useMemo(
-    () => getGradeScore(gpa, isFinancial),
-    [gpa, isFinancial]
-  );
-  const gradeMax = isFinancial ? 30 : 60;
-
-  // 가계곤란: 지역점수 없이 가계곤란점수(별도 서류) 최대 60점 — 간략화: 0~60 슬라이더로 표시
-  const [financialScore, setFinancialScore] = useState(30);
-
-  const distanceScore = useMemo(() => {
-    if (isFinancial) return 0;
-    return isPreviousResident ? 30 : getDistanceScore(selectedRegion);
-  }, [isFinancial, isPreviousResident, selectedRegion]);
-
-  const dormScore = isFinancial ? 0 : (isPreviousResident ? 30 : 0);
-  const regionScore = isFinancial ? 0 : distanceScore;
-
-  const totalScore = isFinancial
-    ? financialScore + gradeScore + volunteer + education
-    : gradeScore + distanceScore + volunteer + education;
-
-  const level = getScoreLevel(totalScore, isFinancial);
-
-  // ── Chart data
-  const chartData = (isFinancial ? gradeScoreMapFinancial : gradeScoreMap).map(
-    (entry) => ({ name: entry.label, score: entry.score })
-  );
-
-  // ── Breakdown items
-  const breakdown = isFinancial
+  // ── Breakdown display items (UI shape derived from ScoreBreakdown) ──
+  const breakdownItems = isFinancial
     ? [
-        { label: "가계곤란점수", value: financialScore, max: 60 },
-        { label: "학점 (성적)", value: gradeScore, max: 30 },
-        { label: "봉사활동", value: volunteer, max: 5 },
-        { label: "필수교육", value: education, max: 5 },
+        { label: "가계곤란점수", value: breakdown.financialScore, max: 60 },
+        { label: "학점 (성적)",  value: breakdown.gradeScore,    max: 30 },
+        { label: "봉사활동",     value: breakdown.volunteerScore, max: 5  },
+        { label: "필수교육",     value: breakdown.educationScore, max: 5  },
       ]
     : [
-        { label: "학점 (성적)", value: gradeScore, max: 60 },
-        {
-          label: isPreviousResident ? "사생점수" : "지역조건",
-          value: distanceScore,
-          max: 30,
-        },
-        { label: "봉사활동", value: volunteer, max: 5 },
-        { label: "필수교육", value: education, max: 5 },
+        { label: "학점 (성적)",                         value: breakdown.gradeScore,    max: 60 },
+        { label: isPreviousResident ? "사생점수" : "지역조건", value: breakdown.distanceScore, max: 30 },
+        { label: "봉사활동",                            value: breakdown.volunteerScore, max: 5  },
+        { label: "필수교육",                            value: breakdown.educationScore, max: 5  },
       ];
 
   return (
@@ -157,7 +114,7 @@ export default function ScoreCalculator() {
               </span>
               <Switch
                 checked={isFinancial}
-                onCheckedChange={setIsFinancial}
+                onCheckedChange={(checked) => setMode(checked ? "financial" : "general")}
                 aria-label="가계곤란 모드 전환"
               />
               <span
@@ -214,12 +171,12 @@ export default function ScoreCalculator() {
                     </Tooltip>
                   </div>
                   <Badge variant="secondary" className="font-bold tabular-nums">
-                    {financialScore}점
+                    {financialRawScore}점
                   </Badge>
                 </div>
                 <Slider
-                  value={[financialScore]}
-                  onValueChange={([v]) => setFinancialScore(v)}
+                  value={[financialRawScore]}
+                  onValueChange={([v]) => setFinancialRawScore(v)}
                   min={0}
                   max={60}
                   step={1}
@@ -268,7 +225,7 @@ export default function ScoreCalculator() {
               </div>
               <p className="text-sm">
                 학점 점수:{" "}
-                <span className="font-bold text-primary tabular-nums">{gradeScore}점</span>
+                <span className="font-bold text-primary tabular-nums">{breakdown.gradeScore}점</span>
                 <span className="text-muted-foreground/60"> / {gradeMax}점</span>
               </p>
             </div>
@@ -327,7 +284,7 @@ export default function ScoreCalculator() {
 
                 <p className="text-sm">
                   {isPreviousResident ? "사생" : "지역"} 점수:{" "}
-                  <span className="font-bold text-primary tabular-nums">{distanceScore}점</span>
+                  <span className="font-bold text-primary tabular-nums">{breakdown.distanceScore}점</span>
                   <span className="text-muted-foreground/60"> / 30점</span>
                 </p>
               </div>
@@ -354,15 +311,15 @@ export default function ScoreCalculator() {
                   <span
                     className={cn(
                       "text-sm font-bold tabular-nums",
-                      volunteer === 5 ? "text-success" : "text-primary"
+                      volunteerRaw === 5 ? "text-success" : "text-primary"
                     )}
                   >
-                    {volunteer}점
+                    {volunteerRaw}점
                   </span>
                 </div>
                 <Slider
-                  value={[volunteer]}
-                  onValueChange={([v]) => setVolunteer(v)}
+                  value={[volunteerRaw]}
+                  onValueChange={([v]) => setVolunteerRaw(v)}
                   min={0}
                   max={5}
                   step={5}
@@ -371,7 +328,7 @@ export default function ScoreCalculator() {
                 <div className="flex justify-between text-xs text-muted-foreground/60 mt-1">
                   <span>미충족 (0점)</span>
                   <span className="flex items-center gap-1">
-                    {volunteer === 5 && <CheckCircle2 className="w-3 h-3 text-success" />}
+                    {volunteerRaw === 5 && <CheckCircle2 className="w-3 h-3 text-success" />}
                     충족 (5점)
                   </span>
                 </div>
@@ -395,15 +352,15 @@ export default function ScoreCalculator() {
                   <span
                     className={cn(
                       "text-sm font-bold tabular-nums",
-                      education === 5 ? "text-success" : "text-primary"
+                      educationRaw === 5 ? "text-success" : "text-primary"
                     )}
                   >
-                    {education}점
+                    {educationRaw}점
                   </span>
                 </div>
                 <Slider
-                  value={[education]}
-                  onValueChange={([v]) => setEducation(v)}
+                  value={[educationRaw]}
+                  onValueChange={([v]) => setEducationRaw(v)}
                   min={0}
                   max={5}
                   step={5}
@@ -412,7 +369,7 @@ export default function ScoreCalculator() {
                 <div className="flex justify-between text-xs text-muted-foreground/60 mt-1">
                   <span>미이수 (0점)</span>
                   <span className="flex items-center gap-1">
-                    {education === 5 && <CheckCircle2 className="w-3 h-3 text-success" />}
+                    {educationRaw === 5 && <CheckCircle2 className="w-3 h-3 text-success" />}
                     이수 완료 (5점)
                   </span>
                 </div>
@@ -432,10 +389,10 @@ export default function ScoreCalculator() {
               <p
                 className={cn(
                   "text-7xl font-extrabold mb-1 tabular-nums tracking-tighter",
-                  level.color
+                  levelInfo.colorClass
                 )}
               >
-                {totalScore}
+                {breakdown.totalScore}
               </p>
               <p className="text-muted-foreground/50 text-sm mb-4">/ 100점</p>
 
@@ -443,16 +400,16 @@ export default function ScoreCalculator() {
               <div
                 className={cn(
                   "inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-sm font-semibold mb-6",
-                  level.bg,
-                  level.color
+                  levelInfo.bgClass,
+                  levelInfo.colorClass
                 )}
               >
-                {level.label}
+                {levelInfo.label}
               </div>
 
               {/* 점수 구성 breakdown */}
               <div className="grid grid-cols-2 gap-2.5 text-left">
-                {breakdown.map((item) => (
+                {breakdownItems.map((item) => (
                   <div key={item.label} className="bg-muted/40 rounded-xl p-3">
                     <p className="text-xs text-muted-foreground/60 mb-1">{item.label}</p>
                     <p className="text-lg font-bold tabular-nums tracking-tight">
@@ -540,7 +497,7 @@ export default function ScoreCalculator() {
                       <Cell
                         key={index}
                         fill={
-                          entry.score === gradeScore
+                          entry.score === breakdown.gradeScore
                             ? "hsl(213, 100%, 30%)"
                             : "hsl(213, 20%, 86%)"
                         }
@@ -549,11 +506,11 @@ export default function ScoreCalculator() {
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
-              {gradeScore > 0 && (
+              {breakdown.gradeScore > 0 && (
                 <p className="text-xs text-center text-muted-foreground/60 mt-2">
                   현재 GPA{" "}
                   <span className="font-semibold text-primary">{gpa.toFixed(2)}</span>{" "}
-                  → {gradeScore}점 (진한 파란색 막대)
+                  → {breakdown.gradeScore}점 (진한 파란색 막대)
                 </p>
               )}
             </div>
