@@ -1,77 +1,211 @@
 /**
- * ScoreCalculator.tsx
- * ─────────────────────────────────────────────────────────────────────────────
- * PRESENTATION LAYER ONLY.
- * All state management and calculation logic lives in:
- *   - src/hooks/useScoreCalculator.ts  (state + derived values)
- *   - src/lib/calc/scoreEngine.ts      (pure calculation functions)
+ * ScoreCalculator.tsx  ─  Phase 2: UX Elevation
+ * ──────────────────────────────────────────────────────────────────────────────
+ * UX improvements in this version:
+ *  1. Region dropdown: per-region point badges (pre-selection awareness)
+ *  2. Score result: framer-motion count-up animation
+ *  3. Score result: relative position progress bar (0-100 spectrum)
+ *  4. Circular score ring SVG visual
+ *  5. Disclaimer: clear uncertainty disclosure below result
+ *  6. Ajou Gold accent for excellent scores (>=85)
  *
- * This component renders the result of useScoreCalculator() with zero
- * business logic of its own.
+ * Logic layer: src/hooks/useScoreCalculator.ts + src/lib/calc/scoreEngine.ts
  */
 
-import { useId } from "react";
-import { Slider } from "@/components/ui/slider";
-import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
+import { useId, useEffect, useRef } from "react";
+import { motion, useSpring, useTransform, animate } from "framer-motion";
+import { Slider }  from "@/components/ui/slider";
+import { Switch }  from "@/components/ui/switch";
+import { Label }   from "@/components/ui/label";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
+import { Badge }   from "@/components/ui/badge";
 import {
   Tooltip, TooltipContent, TooltipTrigger,
 } from "@/components/ui/tooltip";
 import {
-  Calculator, TrendingUp, Info, AlertCircle, CheckCircle2,
+  Calculator, TrendingUp, Info, AlertCircle, CheckCircle2, ShieldAlert,
 } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip as ReTooltip, ResponsiveContainer, Cell,
 } from "recharts";
 import { distanceRegions } from "@/data/dormitoryData";
-import { useScoreCalculator } from "@/hooks/useScoreCalculator";
+import { useScoreCalculator }  from "@/hooks/useScoreCalculator";
 import { cn } from "@/lib/utils";
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Sub-component: Count-up animated number
+// ──────────────────────────────────────────────────────────────────────────────
+
+function AnimatedScore({ value, className }: { value: number; className?: string }) {
+  const nodeRef = useRef<HTMLSpanElement>(null);
+  const prevRef = useRef(value);
+
+  useEffect(() => {
+    const node = nodeRef.current;
+    if (!node) return;
+    const from = prevRef.current;
+    prevRef.current = value;
+
+    const controls = animate(from, value, {
+      duration: 0.7,
+      ease: [0.22, 1, 0.36, 1],
+      onUpdate(latest) {
+        node.textContent = Math.round(latest).toString();
+      },
+    });
+    return () => controls.stop();
+  }, [value]);
+
+  return <span ref={nodeRef} className={className}>{value}</span>;
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Sub-component: Circular score ring
+// ──────────────────────────────────────────────────────────────────────────────
+
+interface ScoreRingProps {
+  score: number;
+  size?: number;
+  strokeWidth?: number;
+  color: string;      // stroke color
+  trackColor?: string;
+}
+
+function ScoreRing({ score, size = 120, strokeWidth = 7, color, trackColor = "hsl(213 20% 90%)" }: ScoreRingProps) {
+  const radius  = (size - strokeWidth) / 2;
+  const circum  = 2 * Math.PI * radius;
+  const pct     = Math.min(100, Math.max(0, score)) / 100;
+  const dashoffset = circum * (1 - pct);
+
+  return (
+    <svg width={size} height={size} className="-rotate-90" aria-hidden="true">
+      {/* Track */}
+      <circle
+        cx={size / 2} cy={size / 2} r={radius}
+        fill="none" stroke={trackColor} strokeWidth={strokeWidth}
+      />
+      {/* Fill */}
+      <motion.circle
+        cx={size / 2} cy={size / 2} r={radius}
+        fill="none"
+        stroke={color}
+        strokeWidth={strokeWidth}
+        strokeLinecap="round"
+        strokeDasharray={circum}
+        initial={{ strokeDashoffset: circum }}
+        animate={{ strokeDashoffset: dashoffset }}
+        transition={{ duration: 1.0, ease: [0.22, 1, 0.36, 1] }}
+      />
+    </svg>
+  );
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Sub-component: relative position spectrum bar
+// ──────────────────────────────────────────────────────────────────────────────
+
+function ScoreSpectrumBar({ score }: { score: number }) {
+  const clampedPct = Math.min(100, Math.max(0, score));
+
+  // Bands: 0-54 red, 55-69 amber, 70-84 blue, 85-100 green
+  const bands = [
+    { from: 0,  to: 54,  label: "경쟁",      color: "#EF4444" },
+    { from: 55, to: 69,  label: "보통",      color: "#D97706" },
+    { from: 70, to: 84,  label: "유리",      color: "#0057B7" },
+    { from: 85, to: 100, label: "매우 유리", color: "#16A34A" },
+  ];
+
+  const activeBand = bands.find(b => score >= b.from && score <= b.to) ?? bands[0];
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-1.5">
+        <p className="text-xs font-medium text-muted-foreground">내 점수 위치</p>
+        <p className="text-xs text-muted-foreground/60">
+          하위 <span className="font-semibold text-foreground">{score}점 / 100점 만점</span>
+        </p>
+      </div>
+
+      {/* Gradient spectrum */}
+      <div className="relative w-full h-3 rounded-full overflow-hidden" style={{
+        background: "linear-gradient(to right, #EF4444 0%, #F59E0B 35%, #3B82F6 60%, #16A34A 85%, #15803D 100%)"
+      }}>
+        {/* Thumb */}
+        <motion.div
+          className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-4 h-4 rounded-full border-2 border-white shadow-md"
+          style={{ backgroundColor: activeBand.color }}
+          initial={{ left: "0%" }}
+          animate={{ left: `${clampedPct}%` }}
+          transition={{ duration: 0.8, ease: [0.22, 1, 0.36, 1] }}
+        />
+      </div>
+
+      {/* Band labels */}
+      <div className="flex justify-between mt-1.5 px-0.5">
+        {bands.map((b) => (
+          <span
+            key={b.label}
+            className={cn(
+              "text-[10px] font-medium transition-all",
+              activeBand.from === b.from
+                ? "opacity-100 font-bold"
+                : "opacity-40"
+            )}
+            style={{ color: b.color }}
+          >
+            {b.label}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// Main Component
+// ──────────────────────────────────────────────────────────────────────────────
 
 export default function ScoreCalculator() {
   const gpaInputId = useId();
 
-  // ── All state + derived values come from the hook ──
   const {
-    isFinancial,
-    setMode,
-    gpa,
-    gpaInput,
-    handleGpaSlider,
-    handleGpaInput,
-    isPreviousResident,
-    setIsPreviousResident,
-    selectedRegion,
-    setSelectedRegion,
-    financialRawScore,
-    setFinancialRawScore,
-    volunteerRaw,
-    setVolunteerRaw,
-    educationRaw,
-    setEducationRaw,
-    breakdown,
-    levelInfo,
-    gradeMax,
-    chartData,
+    isFinancial, setMode,
+    gpa, gpaInput, handleGpaSlider, handleGpaInput,
+    isPreviousResident, setIsPreviousResident,
+    selectedRegion, setSelectedRegion,
+    financialRawScore, setFinancialRawScore,
+    volunteerRaw, setVolunteerRaw,
+    educationRaw, setEducationRaw,
+    breakdown, levelInfo, gradeMax, chartData,
   } = useScoreCalculator();
 
-  // ── Breakdown display items (UI shape derived from ScoreBreakdown) ──
+  const isExcellent = breakdown.totalScore >= 85;
+
+  // Ring stroke color mirrors levelInfo
+  const ringColor = {
+    excellent:   "#16A34A",
+    good:        "#0057B7",
+    average:     "#D97706",
+    competitive: "#EF4444",
+  }[levelInfo.level];
+
+  // Breakdown display items
   const breakdownItems = isFinancial
     ? [
-        { label: "가계곤란점수", value: breakdown.financialScore, max: 60 },
-        { label: "학점 (성적)",  value: breakdown.gradeScore,    max: 30 },
-        { label: "봉사활동",     value: breakdown.volunteerScore, max: 5  },
-        { label: "필수교육",     value: breakdown.educationScore, max: 5  },
+        { label: "가계곤란점수",  value: breakdown.financialScore, max: 60 },
+        { label: "학점 (성적)",    value: breakdown.gradeScore,     max: 30 },
+        { label: "봉사활동",      value: breakdown.volunteerScore, max: 5  },
+        { label: "필수교육",      value: breakdown.educationScore, max: 5  },
       ]
     : [
-        { label: "학점 (성적)",                         value: breakdown.gradeScore,    max: 60 },
-        { label: isPreviousResident ? "사생점수" : "지역조건", value: breakdown.distanceScore, max: 30 },
-        { label: "봉사활동",                            value: breakdown.volunteerScore, max: 5  },
-        { label: "필수교육",                            value: breakdown.educationScore, max: 5  },
+        { label: "학점 (성적)",    value: breakdown.gradeScore,     max: 60 },
+        { label: isPreviousResident ? "사생점수" : "지역조건",
+          value: breakdown.distanceScore, max: 30 },
+        { label: "봉사활동",      value: breakdown.volunteerScore, max: 5  },
+        { label: "필수교육",      value: breakdown.educationScore, max: 5  },
       ];
 
   return (
@@ -104,32 +238,24 @@ export default function ScoreCalculator() {
               </p>
             </div>
             <div className="flex items-center gap-3 shrink-0">
-              <span
-                className={cn(
-                  "text-sm font-medium transition-colors",
-                  !isFinancial ? "text-foreground" : "text-muted-foreground"
-                )}
-              >
+              <span className={cn("text-sm font-medium transition-colors",
+                !isFinancial ? "text-foreground" : "text-muted-foreground")}>
                 일반학생
               </span>
               <Switch
                 checked={isFinancial}
-                onCheckedChange={(checked) => setMode(checked ? "financial" : "general")}
+                onCheckedChange={(c) => setMode(c ? "financial" : "general")}
                 aria-label="가계곤란 모드 전환"
               />
-              <span
-                className={cn(
-                  "text-sm font-medium transition-colors",
-                  isFinancial ? "text-foreground" : "text-muted-foreground"
-                )}
-              >
+              <span className={cn("text-sm font-medium transition-colors",
+                isFinancial ? "text-foreground" : "text-muted-foreground")}>
                 가계곤란학생
               </span>
             </div>
           </div>
         </div>
 
-        {/* ── 가계곤란 안내 배너 ── */}
+        {/* ── 가계곤란 배너 ── */}
         {isFinancial && (
           <div className="max-w-4xl mx-auto mb-6">
             <div className="flex items-start gap-3 p-4 rounded-xl bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800/40">
@@ -137,10 +263,9 @@ export default function ScoreCalculator() {
               <div className="text-sm text-amber-800 dark:text-amber-300">
                 <p className="font-semibold mb-1">가계곤란학생 선발 안내</p>
                 <p className="text-xs leading-relaxed">
-                  학부생 정원의 1% 범위 내에서 선발됩니다. 가계곤란점수(최대 60점)는
+                  학부생 정원의 1% 범위 내에서 선발됩니다. 가계곤란점수(제대 60점)는
                   별도 서류(수급자 증명 등) 제출 후 심사로 확정됩니다.
-                  성적 평점 2.0 이상 요건을 충족해야 합니다. 아래 점수는 예상치이며
-                  실제 점수는 생활관 신청 후 확정됩니다.
+                  성적 평점 2.0 이상 요건을 충족해야 합니다.
                 </p>
               </div>
             </div>
@@ -149,24 +274,21 @@ export default function ScoreCalculator() {
 
         <div className="max-w-4xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-8">
 
-          {/* ── 입력 영역 ── */}
+          {/* ════ 입력 영역 ════ */}
           <div className="space-y-5">
 
-            {/* 가계곤란점수 (가계곤란 모드) */}
+            {/* 가계곤란점수 */}
             {isFinancial && (
               <div className="glass-card-strong rounded-2xl p-6">
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-2">
-                    <Label className="text-base font-semibold tracking-tight">
-                      가계곤란점수
-                    </Label>
+                    <Label className="text-base font-semibold tracking-tight">가계곤란점수</Label>
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <Info className="w-4 h-4 text-muted-foreground/50 cursor-help" />
                       </TooltipTrigger>
                       <TooltipContent className="max-w-xs text-xs">
-                        수급자·차상위·한부모 등 증명서류 제출 후 심사로 확정됩니다.
-                        최대 60점이며, 실제 점수는 신청 후 확인하세요.
+                        수급자·차상위·한부모 등 증명서류 제출 후 심사로 확정됩니다. 최대 60점
                       </TooltipContent>
                     </Tooltip>
                   </div>
@@ -177,14 +299,10 @@ export default function ScoreCalculator() {
                 <Slider
                   value={[financialRawScore]}
                   onValueChange={([v]) => setFinancialRawScore(v)}
-                  min={0}
-                  max={60}
-                  step={1}
-                  className="mb-2"
+                  min={0} max={60} step={1} className="mb-2"
                 />
                 <div className="flex justify-between text-xs text-muted-foreground/60">
-                  <span>0점</span>
-                  <span>60점 (최대)</span>
+                  <span>0점</span><span>60점 (최대)</span>
                 </div>
               </div>
             )}
@@ -198,10 +316,7 @@ export default function ScoreCalculator() {
                 <div className="flex items-center gap-2">
                   <input
                     id={gpaInputId}
-                    type="number"
-                    min={0}
-                    max={4.5}
-                    step={0.01}
+                    type="number" min={0} max={4.5} step={0.01}
                     value={gpaInput}
                     onChange={(e) => handleGpaInput(e.target.value)}
                     className="w-20 text-right text-lg font-bold tabular-nums px-2 py-1 rounded-lg border border-border bg-background/50 focus:outline-none focus:ring-2 focus:ring-primary/30"
@@ -213,15 +328,11 @@ export default function ScoreCalculator() {
               <Slider
                 value={[gpa]}
                 onValueChange={([v]) => handleGpaSlider(v)}
-                min={0}
-                max={4.5}
-                step={0.01}
-                className="mb-2"
-                aria-label="GPA 슬라이더"
+                min={0} max={4.5} step={0.01}
+                className="mb-2" aria-label="GPA 슬라이더"
               />
               <div className="flex justify-between text-xs text-muted-foreground/60 mb-3">
-                <span>0.00</span>
-                <span>4.50</span>
+                <span>0.00</span><span>4.50</span>
               </div>
               <p className="text-sm">
                 학점 점수:{" "}
@@ -230,7 +341,7 @@ export default function ScoreCalculator() {
               </p>
             </div>
 
-            {/* 거리/사생점수 (일반 모드) */}
+            {/* ✅ 지역 드롭다운 — UX IMPROVEMENT: per-region point badges */}
             {!isFinancial && (
               <div className="glass-card-strong rounded-2xl p-6">
                 <div className="flex items-center gap-2 mb-4">
@@ -242,12 +353,13 @@ export default function ScoreCalculator() {
                       <Info className="w-4 h-4 text-muted-foreground/50 cursor-help" />
                     </TooltipTrigger>
                     <TooltipContent className="max-w-xs text-xs">
-                      직전 학기 기숙사 거주자는 사생점수 30점을 적용합니다.
-                      신규 지원자는 거주지 지역 기준 거리 점수를 적용합니다.
+                      직전 학기 기숙사 거주자는 사생점수 30점 적용.
+                      신규 지원자는 거주지 지역 기준 거리점수 적용.
                     </TooltipContent>
                   </Tooltip>
                 </div>
 
+                {/* 사생 토글 */}
                 <div className="flex items-center gap-3 mb-4 p-3 rounded-xl bg-muted/30">
                   <Switch
                     checked={isPreviousResident}
@@ -265,15 +377,38 @@ export default function ScoreCalculator() {
                     <SelectTrigger className="mb-3">
                       <SelectValue placeholder="거주 지역을 선택하세요" />
                     </SelectTrigger>
-                    <SelectContent className="max-h-64">
+                    <SelectContent className="max-h-72">
                       {distanceRegions.map((group) => (
                         <div key={group.category}>
-                          <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground sticky top-0 bg-popover">
-                            {group.category}
+                          {/* Category header with total points */}
+                          <div className="flex items-center justify-between px-2 py-1.5 sticky top-0 bg-popover border-b border-border/40">
+                            <span className="text-xs font-semibold text-muted-foreground">
+                              {group.category}
+                            </span>
+                            <span className={cn(
+                              "region-points-badge",
+                              group.points === 30 ? "region-points-30" :
+                              group.points === 15 ? "region-points-15" :
+                              "region-points-0"
+                            )}>
+                              {group.points}점
+                            </span>
                           </div>
+
+                          {/* Region items with inline point badge */}
                           {group.regions.map((r) => (
-                            <SelectItem key={r} value={r}>
-                              {r}
+                            <SelectItem key={r} value={r} className="pr-2">
+                              <div className="flex items-center justify-between w-full gap-3 min-w-[200px]">
+                                <span className="flex-1 text-sm">{r}</span>
+                                <span className={cn(
+                                  "region-points-badge shrink-0",
+                                  group.points === 30 ? "region-points-30" :
+                                  group.points === 15 ? "region-points-15" :
+                                  "region-points-0"
+                                )}>
+                                  +{group.points}
+                                </span>
+                              </div>
                             </SelectItem>
                           ))}
                         </div>
@@ -290,10 +425,9 @@ export default function ScoreCalculator() {
               </div>
             )}
 
-            {/* 봉사 & 필수교육 */}
+            {/* 봉사 & 당직필수교육 */}
             <div className="glass-card-strong rounded-2xl p-6 space-y-6">
-
-              {/* 봉사활동 */}
+              {/* 봉사 */}
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2">
@@ -303,27 +437,18 @@ export default function ScoreCalculator() {
                         <Info className="w-3.5 h-3.5 text-muted-foreground/50 cursor-help" />
                       </TooltipTrigger>
                       <TooltipContent className="max-w-xs text-xs leading-relaxed">
-                        봉사시간 28시간 이상 또는 사회봉사 과목(사회봉사이론·실천1·실천2) 1과목 이수 시 5점.
-                        자원봉사 실적은 아주허브에 등록 후 반영됩니다.
+                        28시간 이상 봉사 또는 사회봉사 과목 1과목 이수 시 5점
                       </TooltipContent>
                     </Tooltip>
                   </div>
-                  <span
-                    className={cn(
-                      "text-sm font-bold tabular-nums",
-                      volunteerRaw === 5 ? "text-success" : "text-primary"
-                    )}
-                  >
+                  <span className={cn("text-sm font-bold tabular-nums",
+                    volunteerRaw === 5 ? "text-success" : "text-primary")}>
                     {volunteerRaw}점
                   </span>
                 </div>
                 <Slider
-                  value={[volunteerRaw]}
-                  onValueChange={([v]) => setVolunteerRaw(v)}
-                  min={0}
-                  max={5}
-                  step={5}
-                  aria-label="봉사활동 점수"
+                  value={[volunteerRaw]} onValueChange={([v]) => setVolunteerRaw(v)}
+                  min={0} max={5} step={5} aria-label="봉사활동 점수"
                 />
                 <div className="flex justify-between text-xs text-muted-foreground/60 mt-1">
                   <span>미충족 (0점)</span>
@@ -334,7 +459,7 @@ export default function ScoreCalculator() {
                 </div>
               </div>
 
-              {/* 법정필수교육 */}
+              {/* 당직필수교육 */}
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2">
@@ -344,27 +469,18 @@ export default function ScoreCalculator() {
                         <Info className="w-3.5 h-3.5 text-muted-foreground/50 cursor-help" />
                       </TooltipTrigger>
                       <TooltipContent className="max-w-xs text-xs leading-relaxed">
-                        성희롱예방, 성폭력/가정폭력예방, 장애인식개선 교육 3과목 모두 이수 시 5점.
-                        인권센터 성평등상담소 교육 기준입니다.
+                        성희롱예방, 성폭력/가정폭력예방, 장애인식개선 교육 3과목 모두 이수 시 5점
                       </TooltipContent>
                     </Tooltip>
                   </div>
-                  <span
-                    className={cn(
-                      "text-sm font-bold tabular-nums",
-                      educationRaw === 5 ? "text-success" : "text-primary"
-                    )}
-                  >
+                  <span className={cn("text-sm font-bold tabular-nums",
+                    educationRaw === 5 ? "text-success" : "text-primary")}>
                     {educationRaw}점
                   </span>
                 </div>
                 <Slider
-                  value={[educationRaw]}
-                  onValueChange={([v]) => setEducationRaw(v)}
-                  min={0}
-                  max={5}
-                  step={5}
-                  aria-label="법정필수교육 점수"
+                  value={[educationRaw]} onValueChange={([v]) => setEducationRaw(v)}
+                  min={0} max={5} step={5} aria-label="법정필수교육 점수"
                 />
                 <div className="flex justify-between text-xs text-muted-foreground/60 mt-1">
                   <span>미이수 (0점)</span>
@@ -377,112 +493,146 @@ export default function ScoreCalculator() {
             </div>
           </div>
 
-          {/* ── 결과 영역 ── */}
+          {/* ════ 결과 영역 ════ */}
           <div className="space-y-5">
 
-            {/* 총점 카드 */}
-            <div className="glass-card-strong rounded-2xl p-8 text-center premium-glow">
-              <TrendingUp className="w-7 h-7 text-primary mx-auto mb-3" />
-              <p className="text-xs text-muted-foreground/60 mb-2 uppercase tracking-widest font-medium">
-                예상 총점
-              </p>
-              <p
-                className={cn(
-                  "text-7xl font-extrabold mb-1 tabular-nums tracking-tighter",
-                  levelInfo.colorClass
-                )}
-              >
-                {breakdown.totalScore}
-              </p>
-              <p className="text-muted-foreground/50 text-sm mb-4">/ 100점</p>
+            {/* ✅ 총점 카드 — Navy gradient + ring + count-up */}
+            <motion.div
+              key={levelInfo.level}
+              initial={{ opacity: 0.8, scale: 0.97 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+              className={cn(
+                "rounded-2xl p-8 text-center relative overflow-hidden",
+                isExcellent
+                  ? "gradient-score-excellent text-white"
+                  : "gradient-score-card text-white"
+              )}
+            >
+              {/* Background shimmer for excellent */}
+              {isExcellent && (
+                <div
+                  className="absolute inset-0 opacity-30 pointer-events-none"
+                  style={{
+                    background: "linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.15) 50%, transparent 100%)",
+                    backgroundSize: "200% 100%",
+                    animation: "gold-shimmer 3s linear infinite",
+                  }}
+                />
+              )}
 
-              {/* 점수 해석 뱃지 */}
+              {/* Ring + number */}
+              <div className="relative inline-flex items-center justify-center mb-4">
+                <ScoreRing
+                  score={breakdown.totalScore}
+                  size={128}
+                  strokeWidth={7}
+                  color={ringColor}
+                  trackColor="rgba(255,255,255,0.15)"
+                />
+                <div className="absolute inset-0 flex flex-col items-center justify-center">
+                  <AnimatedScore
+                    value={breakdown.totalScore}
+                    className="text-4xl font-extrabold tabular-nums leading-none tracking-tighter text-white"
+                  />
+                  <span className="text-[11px] text-white/60 font-medium mt-0.5">점 / 100</span>
+                </div>
+              </div>
+
+              {/* Level badge */}
               <div
                 className={cn(
-                  "inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-sm font-semibold mb-6",
-                  levelInfo.bgClass,
-                  levelInfo.colorClass
+                  "inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-bold mb-5",
+                  isExcellent
+                    ? "bg-white/20 text-white border border-white/30"
+                    : "bg-white/10 text-white/90 border border-white/20"
                 )}
               >
                 {levelInfo.label}
               </div>
 
-              {/* 점수 구성 breakdown */}
-              <div className="grid grid-cols-2 gap-2.5 text-left">
+              {/* ✅ Spectrum bar */}
+              <div className="bg-white/[0.08] backdrop-blur-sm rounded-xl p-3 mb-5">
+                <ScoreSpectrumBar score={breakdown.totalScore} />
+              </div>
+
+              {/* Breakdown grid */}
+              <div className="grid grid-cols-2 gap-2">
                 {breakdownItems.map((item) => (
-                  <div key={item.label} className="bg-muted/40 rounded-xl p-3">
-                    <p className="text-xs text-muted-foreground/60 mb-1">{item.label}</p>
-                    <p className="text-lg font-bold tabular-nums tracking-tight">
+                  <div key={item.label}
+                    className="bg-white/[0.08] backdrop-blur-sm rounded-xl p-3 text-left border border-white/[0.08]">
+                    <p className="text-[10px] text-white/50 mb-1 font-medium">{item.label}</p>
+                    <p className="text-lg font-bold tabular-nums tracking-tight text-white">
                       {item.value}
-                      <span className="text-xs text-muted-foreground/40 font-normal">
-                        /{item.max}
-                      </span>
+                      <span className="text-xs text-white/40 font-normal">/{item.max}</span>
                     </p>
-                    {/* progress bar */}
-                    <div className="w-full h-1 bg-muted/60 rounded-full mt-1.5 overflow-hidden">
-                      <div
-                        className="h-full bg-primary/60 rounded-full transition-all duration-500"
-                        style={{ width: `${(item.value / item.max) * 100}%` }}
+                    <div className="w-full h-1 bg-white/10 rounded-full mt-1.5 overflow-hidden">
+                      <motion.div
+                        className="h-full rounded-full"
+                        style={{ backgroundColor: isExcellent ? "#C5A028" : "rgba(255,255,255,0.5)" }}
+                        initial={{ width: "0%" }}
+                        animate={{ width: `${(item.value / item.max) * 100}%` }}
+                        transition={{ duration: 0.8, delay: 0.1, ease: [0.22, 1, 0.36, 1] }}
                       />
                     </div>
                   </div>
                 ))}
               </div>
+            </motion.div>
+
+            {/* ✅ Disclaimer — reliability notice */}
+            <div className="glass-card-strong rounded-xl p-4 border-l-4 border-l-amber-400/60">
+              <div className="flex items-start gap-2.5">
+                <ShieldAlert className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-xs font-semibold text-foreground/80 mb-1">정보 신뢰성 안내</p>
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    본 결과는 <strong>과거 선발 기준에 따른 시뮬레이션</strong>이며,
+                    실제 합격선은 당해 지원자 분포에 따라 <strong>변동될 수 있습니다.</strong>
+                    미래를 보장하지 않으며, 반드시 공식 안내사항을 확인하세요.
+                  </p>
+                </div>
+              </div>
             </div>
 
-            {/* 점수 해석 안내 */}
+            {/* 학점 오차리하 안내 */}
             <div className="glass-card-strong rounded-2xl p-5">
               <h3 className="text-sm font-semibold mb-3 tracking-tight">점수 참고 안내</h3>
               <div className="space-y-2 text-xs text-muted-foreground leading-relaxed">
                 <p className="flex items-start gap-2">
-                  <span className="mt-0.5 w-1.5 h-1.5 rounded-full bg-success shrink-0 mt-1.5" />
+                  <span className="w-1.5 h-1.5 rounded-full bg-success shrink-0 mt-1.5" />
                   점수는 참고용이며 실제 배정 여부는 지원자 현황에 따라 달라집니다.
                 </p>
                 <p className="flex items-start gap-2">
-                  <span className="mt-0.5 w-1.5 h-1.5 rounded-full bg-warning shrink-0 mt-1.5" />
-                  동점자는 평점 → 취득학점 → 생년월일(연소자) 순으로 처리됩니다.
+                  <span className="w-1.5 h-1.5 rounded-full bg-warning shrink-0 mt-1.5" />
+                  동점자는 평점 → 취득학점 → 생년월일(연소자) 순으로 처리.
                 </p>
                 <p className="flex items-start gap-2">
-                  <span className="mt-0.5 w-1.5 h-1.5 rounded-full bg-primary/60 shrink-0 mt-1.5" />
-                  신청학점·취득학점·성적 평점이 없으면 성적 60점으로 환산 반영됩니다.
+                  <span className="w-1.5 h-1.5 rounded-full bg-primary/60 shrink-0 mt-1.5" />
+                  신청학점·취득학점·성적 평점이 없으면 성적 60점으로 환산.
                 </p>
                 {isFinancial && (
                   <p className="flex items-start gap-2">
-                    <span className="mt-0.5 w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0 mt-1.5" />
-                    가계곤란 선발은 학부생 정원 1% 이내로 매우 제한적입니다.
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0 mt-1.5" />
+                    가계곤난 선발은 학부생 정원 1% 이내로 매우 제한적.
                   </p>
                 )}
               </div>
             </div>
 
-            {/* 학점 ↔ 점수 차트 */}
+            {/* 학점 ↔ 점수 상관 차트 */}
             <div className="glass-card-strong rounded-2xl p-6">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-sm font-semibold tracking-tight">
-                  학점 ↔ 점수 매핑
-                </h3>
+                <h3 className="text-sm font-semibold tracking-tight">학점 ↔ 점수 매핑</h3>
                 <span className="text-xs text-muted-foreground/60">
-                  {isFinancial ? "가계곤란 기준 (30점 만점)" : "일반 기준 (60점 만점)"}
+                  {isFinancial ? "가계곤난 기준 (30점 만점)" : "일반 기준 (60점 만점)"}
                 </span>
               </div>
               <ResponsiveContainer width="100%" height={240}>
-                <BarChart
-                  data={chartData}
-                  layout="vertical"
-                  margin={{ left: 16, right: 8 }}
-                >
+                <BarChart data={chartData} layout="vertical" margin={{ left: 16, right: 8 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(213 20% 92%)" />
-                  <XAxis
-                    type="number"
-                    domain={[0, isFinancial ? 30 : 60]}
-                    tick={{ fontSize: 10 }}
-                  />
-                  <YAxis
-                    type="category"
-                    dataKey="name"
-                    tick={{ fontSize: 9 }}
-                    width={78}
-                  />
+                  <XAxis type="number" domain={[0, isFinancial ? 30 : 60]} tick={{ fontSize: 10 }} />
+                  <YAxis type="category" dataKey="name" tick={{ fontSize: 9 }} width={78} />
                   <ReTooltip
                     contentStyle={{
                       borderRadius: "12px",
@@ -493,13 +643,13 @@ export default function ScoreCalculator() {
                     formatter={(v: number) => [`${v}점`, "배점"]}
                   />
                   <Bar dataKey="score" radius={[0, 6, 6, 0]}>
-                    {chartData.map((entry, index) => (
+                    {chartData.map((entry, idx) => (
                       <Cell
-                        key={index}
+                        key={idx}
                         fill={
                           entry.score === breakdown.gradeScore
-                            ? "hsl(213, 100%, 30%)"
-                            : "hsl(213, 20%, 86%)"
+                            ? "#002855"   // Ajou Navy for active bar
+                            : "hsl(213, 20%, 88%)"
                         }
                       />
                     ))}
@@ -509,8 +659,8 @@ export default function ScoreCalculator() {
               {breakdown.gradeScore > 0 && (
                 <p className="text-xs text-center text-muted-foreground/60 mt-2">
                   현재 GPA{" "}
-                  <span className="font-semibold text-primary">{gpa.toFixed(2)}</span>{" "}
-                  → {breakdown.gradeScore}점 (진한 파란색 막대)
+                  <span className="font-semibold text-primary">{gpa.toFixed(2)}</span>
+                  {" "}→ {breakdown.gradeScore}점 (진한 네이비 막대)
                 </p>
               )}
             </div>
