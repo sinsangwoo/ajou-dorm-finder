@@ -1,5 +1,16 @@
-import { useState, useMemo, useId } from "react";
-import { motion } from "framer-motion";
+/**
+ * ScoreCalculator.tsx
+ * ─────────────────────────────────────────────────────────────────────────────
+ * PRESENTATION LAYER ONLY.
+ * All state management and calculation logic lives in:
+ *   - src/hooks/useScoreCalculator.ts  (state + derived values)
+ *   - src/lib/calc/scoreEngine.ts      (pure calculation functions)
+ *
+ * This component renders the result of useScoreCalculator() with zero
+ * business logic of its own.
+ */
+
+import { useId } from "react";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
@@ -17,90 +28,50 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip as ReTooltip, ResponsiveContainer, Cell,
 } from "recharts";
-import {
-  gradeScoreMap, gradeScoreMapFinancial,
-  getGradeScore, distanceRegions, getDistanceScore,
-} from "@/data/dormitoryData";
-import { useCountUp } from "@/hooks/useCountUp";
+import { distanceRegions } from "@/data/dormitoryData";
+import { useScoreCalculator } from "@/hooks/useScoreCalculator";
 import { cn } from "@/lib/utils";
-
-// ── Score interpretation helper ──────────────────
-function getScoreLevel(score: number, isFinancial: boolean) {
-  if (isFinancial) {
-    if (score >= 85) return { label: "매우 유리", color: "text-success", bg: "bg-success/10" };
-    if (score >= 70) return { label: "유리", color: "text-primary", bg: "bg-primary/10" };
-    if (score >= 55) return { label: "보통", color: "text-warning", bg: "bg-warning/10" };
-    return { label: "경쟁 필요", color: "text-destructive", bg: "bg-destructive/10" };
-  }
-  if (score >= 85) return { label: "매우 유리", color: "text-success", bg: "bg-success/10" };
-  if (score >= 70) return { label: "유리", color: "text-primary", bg: "bg-primary/10" };
-  if (score >= 55) return { label: "보통", color: "text-warning", bg: "bg-warning/10" };
-  return { label: "경쟁 필요", color: "text-destructive", bg: "bg-destructive/10" };
-}
 
 export default function ScoreCalculator() {
   const gpaInputId = useId();
 
-  const [isFinancial, setIsFinancial] = useState(false);
+  // ── All state + derived values come from the hook ──
+  const {
+    isFinancial,
+    setMode,
+    gpa,
+    gpaInput,
+    handleGpaSlider,
+    handleGpaInput,
+    isPreviousResident,
+    setIsPreviousResident,
+    selectedRegion,
+    setSelectedRegion,
+    financialRawScore,
+    setFinancialRawScore,
+    volunteerRaw,
+    setVolunteerRaw,
+    educationRaw,
+    setEducationRaw,
+    breakdown,
+    levelInfo,
+    gradeMax,
+    chartData,
+  } = useScoreCalculator();
 
-  // GPA
-  const [gpa, setGpa] = useState(3.5);
-  const [gpaInput, setGpaInput] = useState("3.50");
-
-  const handleGpaSlider = (v: number) => {
-    setGpa(v);
-    setGpaInput(v.toFixed(2));
-  };
-  const handleGpaInput = (raw: string) => {
-    setGpaInput(raw);
-    const num = parseFloat(raw);
-    if (!isNaN(num) && num >= 0 && num <= 4.5) setGpa(num);
-  };
-
-  const [isPreviousResident, setIsPreviousResident] = useState(false);
-  const [selectedRegion, setSelectedRegion] = useState("");
-  const [volunteer, setVolunteer] = useState(0);
-  const [education, setEducation] = useState(0);
-
-  const gradeScore = useMemo(() => getGradeScore(gpa, isFinancial), [gpa, isFinancial]);
-  const gradeMax = isFinancial ? 30 : 60;
-
-  const [financialScore, setFinancialScore] = useState(30);
-
-  const distanceScore = useMemo(() => {
-    if (isFinancial) return 0;
-    return isPreviousResident ? 30 : getDistanceScore(selectedRegion);
-  }, [isFinancial, isPreviousResident, selectedRegion]);
-
-  const totalScore = isFinancial
-    ? financialScore + gradeScore + volunteer + education
-    : gradeScore + distanceScore + volunteer + education;
-
-  const level = getScoreLevel(totalScore, isFinancial);
-
-  // ── Count-up animation for total score ────────────
-  const animatedTotal = useCountUp(totalScore, 1000);
-
-  const chartData = (isFinancial ? gradeScoreMapFinancial : gradeScoreMap).map(
-    (entry) => ({ name: entry.label, score: entry.score })
-  );
-
-  const breakdown = isFinancial
+  // ── Breakdown display items (UI shape derived from ScoreBreakdown) ──
+  const breakdownItems = isFinancial
     ? [
-        { label: "가계곤란점수", value: financialScore, max: 60 },
-        { label: "학점 (성적)", value: gradeScore, max: 30 },
-        { label: "봉사활동", value: volunteer, max: 5 },
-        { label: "필수교육", value: education, max: 5 },
+        { label: "가계곤란점수", value: breakdown.financialScore, max: 60 },
+        { label: "학점 (성적)",  value: breakdown.gradeScore,    max: 30 },
+        { label: "봉사활동",     value: breakdown.volunteerScore, max: 5  },
+        { label: "필수교육",     value: breakdown.educationScore, max: 5  },
       ]
     : [
-        { label: "학점 (성적)", value: gradeScore, max: 60 },
-        {
-          label: isPreviousResident ? "사생점수" : "지역조건",
-          value: distanceScore,
-          max: 30,
-        },
-        { label: "봉사활동", value: volunteer, max: 5 },
-        { label: "필수교육", value: education, max: 5 },
+        { label: "학점 (성적)",                         value: breakdown.gradeScore,    max: 60 },
+        { label: isPreviousResident ? "사생점수" : "지역조건", value: breakdown.distanceScore, max: 30 },
+        { label: "봉사활동",                            value: breakdown.volunteerScore, max: 5  },
+        { label: "필수교육",                            value: breakdown.educationScore, max: 5  },
       ];
 
   return (
@@ -159,7 +130,11 @@ export default function ScoreCalculator() {
               >
                 일반학생
               </span>
-              <Switch checked={isFinancial} onCheckedChange={setIsFinancial} />
+              <Switch
+                checked={isFinancial}
+                onCheckedChange={(checked) => setMode(checked ? "financial" : "general")}
+                aria-label="가계곤란 모드 전환"
+              />
               <span
                 className={cn(
                   \"text-sm font-medium transition-colors\",
@@ -214,14 +189,211 @@ export default function ScoreCalculator() {
                       </TooltipContent>
                     </Tooltip>
                   </div>
-                  <Badge variant=\"secondary\" className=\"font-bold tabular-nums\">{financialScore}점</Badge>
+                  <Badge variant="secondary" className="font-bold tabular-nums">
+                    {financialRawScore}점
+                  </Badge>
                 </div>
-                <Slider value={[financialScore]} onValueChange={([v]) => setFinancialScore(v)} min={0} max={60} step={1} />
-              </motion.div>
+                <Slider
+                  value={[financialRawScore]}
+                  onValueChange={([v]) => setFinancialRawScore(v)}
+                  min={0}
+                  max={60}
+                  step={1}
+                  className="mb-2"
+                />
+                <div className="flex justify-between text-xs text-muted-foreground/60">
+                  <span>0점</span>
+                  <span>60점 (최대)</span>
+                </div>
+              </div>
             )}
-            {/* GPA input - keeping existing structure */}
-            {/* Distance/dorm score - keeping existing */}
-            {/* Volunteer & education - keeping existing */}
+
+            {/* GPA */}
+            <div className="glass-card-strong rounded-2xl p-6">
+              <div className="flex items-center justify-between mb-4">
+                <Label htmlFor={gpaInputId} className="text-base font-semibold tracking-tight">
+                  학점 (GPA)
+                </Label>
+                <div className="flex items-center gap-2">
+                  <input
+                    id={gpaInputId}
+                    type="number"
+                    min={0}
+                    max={4.5}
+                    step={0.01}
+                    value={gpaInput}
+                    onChange={(e) => handleGpaInput(e.target.value)}
+                    className="w-20 text-right text-lg font-bold tabular-nums px-2 py-1 rounded-lg border border-border bg-background/50 focus:outline-none focus:ring-2 focus:ring-primary/30"
+                    aria-label="GPA 직접 입력"
+                  />
+                  <span className="text-sm text-muted-foreground/60">/ 4.50</span>
+                </div>
+              </div>
+              <Slider
+                value={[gpa]}
+                onValueChange={([v]) => handleGpaSlider(v)}
+                min={0}
+                max={4.5}
+                step={0.01}
+                className="mb-2"
+                aria-label="GPA 슬라이더"
+              />
+              <div className="flex justify-between text-xs text-muted-foreground/60 mb-3">
+                <span>0.00</span>
+                <span>4.50</span>
+              </div>
+              <p className="text-sm">
+                학점 점수:{" "}
+                <span className="font-bold text-primary tabular-nums">{breakdown.gradeScore}점</span>
+                <span className="text-muted-foreground/60"> / {gradeMax}점</span>
+              </p>
+            </div>
+
+            {/* 거리/사생점수 (일반 모드) */}
+            {!isFinancial && (
+              <div className="glass-card-strong rounded-2xl p-6">
+                <div className="flex items-center gap-2 mb-4">
+                  <Label className="text-base font-semibold tracking-tight">
+                    거리 조건 / 사생점수
+                  </Label>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Info className="w-4 h-4 text-muted-foreground/50 cursor-help" />
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-xs text-xs">
+                      직전 학기 기숙사 거주자는 사생점수 30점을 적용합니다.
+                      신규 지원자는 거주지 지역 기준 거리 점수를 적용합니다.
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
+
+                <div className="flex items-center gap-3 mb-4 p-3 rounded-xl bg-muted/30">
+                  <Switch
+                    checked={isPreviousResident}
+                    onCheckedChange={setIsPreviousResident}
+                    id="prev-resident"
+                  />
+                  <label htmlFor="prev-resident" className="text-sm cursor-pointer">
+                    직전 학기 기숙사 거주자입니다
+                    <span className="ml-2 text-xs text-primary font-semibold">(사생점수 30점)</span>
+                  </label>
+                </div>
+
+                {!isPreviousResident && (
+                  <Select value={selectedRegion} onValueChange={setSelectedRegion}>
+                    <SelectTrigger className="mb-3">
+                      <SelectValue placeholder="거주 지역을 선택하세요" />
+                    </SelectTrigger>
+                    <SelectContent className="max-h-64">
+                      {distanceRegions.map((group) => (
+                        <div key={group.category}>
+                          <div className="px-2 py-1.5 text-xs font-semibold text-muted-foreground sticky top-0 bg-popover">
+                            {group.category}
+                          </div>
+                          {group.regions.map((r) => (
+                            <SelectItem key={r} value={r}>
+                              {r}
+                            </SelectItem>
+                          ))}
+                        </div>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+
+                <p className="text-sm">
+                  {isPreviousResident ? "사생" : "지역"} 점수:{" "}
+                  <span className="font-bold text-primary tabular-nums">{breakdown.distanceScore}점</span>
+                  <span className="text-muted-foreground/60"> / 30점</span>
+                </p>
+              </div>
+            )}
+
+            {/* 봉사 & 필수교육 */}
+            <div className="glass-card-strong rounded-2xl p-6 space-y-6">
+
+              {/* 봉사활동 */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <Label className="text-sm font-semibold">봉사활동 점수</Label>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Info className="w-3.5 h-3.5 text-muted-foreground/50 cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-xs text-xs leading-relaxed">
+                        봉사시간 28시간 이상 또는 사회봉사 과목(사회봉사이론·실천1·실천2) 1과목 이수 시 5점.
+                        자원봉사 실적은 아주허브에 등록 후 반영됩니다.
+                      </TooltipContent>
+                    </Tooltip>
+                  </div>
+                  <span
+                    className={cn(
+                      "text-sm font-bold tabular-nums",
+                      volunteerRaw === 5 ? "text-success" : "text-primary"
+                    )}
+                  >
+                    {volunteerRaw}점
+                  </span>
+                </div>
+                <Slider
+                  value={[volunteerRaw]}
+                  onValueChange={([v]) => setVolunteerRaw(v)}
+                  min={0}
+                  max={5}
+                  step={5}
+                  aria-label="봉사활동 점수"
+                />
+                <div className="flex justify-between text-xs text-muted-foreground/60 mt-1">
+                  <span>미충족 (0점)</span>
+                  <span className="flex items-center gap-1">
+                    {volunteerRaw === 5 && <CheckCircle2 className="w-3 h-3 text-success" />}
+                    충족 (5점)
+                  </span>
+                </div>
+              </div>
+
+              {/* 법정필수교육 */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <Label className="text-sm font-semibold">법정필수교육 점수</Label>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Info className="w-3.5 h-3.5 text-muted-foreground/50 cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-xs text-xs leading-relaxed">
+                        성희롱예방, 성폭력/가정폭력예방, 장애인식개선 교육 3과목 모두 이수 시 5점.
+                        인권센터 성평등상담소 교육 기준입니다.
+                      </TooltipContent>
+                    </Tooltip>
+                  </div>
+                  <span
+                    className={cn(
+                      "text-sm font-bold tabular-nums",
+                      educationRaw === 5 ? "text-success" : "text-primary"
+                    )}
+                  >
+                    {educationRaw}점
+                  </span>
+                </div>
+                <Slider
+                  value={[educationRaw]}
+                  onValueChange={([v]) => setEducationRaw(v)}
+                  min={0}
+                  max={5}
+                  step={5}
+                  aria-label="법정필수교육 점수"
+                />
+                <div className="flex justify-between text-xs text-muted-foreground/60 mt-1">
+                  <span>미이수 (0점)</span>
+                  <span className="flex items-center gap-1">
+                    {educationRaw === 5 && <CheckCircle2 className="w-3 h-3 text-success" />}
+                    이수 완료 (5점)
+                  </span>
+                </div>
+              </div>
+            </div>
           </div>
 
           {/* Results section */}
@@ -236,29 +408,33 @@ export default function ScoreCalculator() {
               <p className=\"text-xs text-muted-foreground/60 mb-2 uppercase tracking-widest font-medium\">
                 예상 총점
               </p>
-              <motion.p
-                key={animatedTotal}
-                className={cn(\"text-7xl font-extrabold mb-1 tabular-nums tracking-tighter\", level.color)}
+              <p
+                className={cn(
+                  "text-7xl font-extrabold mb-1 tabular-nums tracking-tighter",
+                  levelInfo.colorClass
+                )}
               >
-                {animatedTotal}
-              </motion.p>
-              <p className=\"text-muted-foreground/50 text-sm mb-4\">/ 100점</p>
+                {breakdown.totalScore}
+              </p>
+              <p className="text-muted-foreground/50 text-sm mb-4">/ 100점</p>
 
-              <div className={cn(\"inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-sm font-semibold mb-6\", level.bg, level.color)}>
-                {level.label}
+              {/* 점수 해석 뱃지 */}
+              <div
+                className={cn(
+                  "inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-sm font-semibold mb-6",
+                  levelInfo.bgClass,
+                  levelInfo.colorClass
+                )}
+              >
+                {levelInfo.label}
               </div>
 
-              <div className=\"grid grid-cols-2 gap-2.5 text-left\">
-                {breakdown.map((item) => (
-                  <motion.div
-                    key={item.label}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.3 }}
-                    className=\"bg-muted/40 rounded-xl p-3\"
-                  >
-                    <p className=\"text-xs text-muted-foreground/60 mb-1\">{item.label}</p>
-                    <p className=\"text-lg font-bold tabular-nums tracking-tight\">
+              {/* 점수 구성 breakdown */}
+              <div className="grid grid-cols-2 gap-2.5 text-left">
+                {breakdownItems.map((item) => (
+                  <div key={item.label} className="bg-muted/40 rounded-xl p-3">
+                    <p className="text-xs text-muted-foreground/60 mb-1">{item.label}</p>
+                    <p className="text-lg font-bold tabular-nums tracking-tight">
                       {item.value}
                       <span className=\"text-xs text-muted-foreground/40 font-normal\">/{item.max}</span>
                     </p>
@@ -275,7 +451,65 @@ export default function ScoreCalculator() {
               </div>
             </motion.div>
 
-            {/* Chart and other sections keep existing code */}
+            {/* 학점 ↔ 점수 차트 */}
+            <div className="glass-card-strong rounded-2xl p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-sm font-semibold tracking-tight">
+                  학점 ↔ 점수 매핑
+                </h3>
+                <span className="text-xs text-muted-foreground/60">
+                  {isFinancial ? "가계곤란 기준 (30점 만점)" : "일반 기준 (60점 만점)"}
+                </span>
+              </div>
+              <ResponsiveContainer width="100%" height={240}>
+                <BarChart
+                  data={chartData}
+                  layout="vertical"
+                  margin={{ left: 16, right: 8 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(213 20% 92%)" />
+                  <XAxis
+                    type="number"
+                    domain={[0, isFinancial ? 30 : 60]}
+                    tick={{ fontSize: 10 }}
+                  />
+                  <YAxis
+                    type="category"
+                    dataKey="name"
+                    tick={{ fontSize: 9 }}
+                    width={78}
+                  />
+                  <ReTooltip
+                    contentStyle={{
+                      borderRadius: "12px",
+                      border: "1px solid hsl(213 15% 91%)",
+                      boxShadow: "0 4px 20px rgba(0,0,0,0.06)",
+                      fontSize: "12px",
+                    }}
+                    formatter={(v: number) => [`${v}점`, "배점"]}
+                  />
+                  <Bar dataKey="score" radius={[0, 6, 6, 0]}>
+                    {chartData.map((entry, index) => (
+                      <Cell
+                        key={index}
+                        fill={
+                          entry.score === breakdown.gradeScore
+                            ? "hsl(213, 100%, 30%)"
+                            : "hsl(213, 20%, 86%)"
+                        }
+                      />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+              {breakdown.gradeScore > 0 && (
+                <p className="text-xs text-center text-muted-foreground/60 mt-2">
+                  현재 GPA{" "}
+                  <span className="font-semibold text-primary">{gpa.toFixed(2)}</span>{" "}
+                  → {breakdown.gradeScore}점 (진한 파란색 막대)
+                </p>
+              )}
+            </div>
           </div>
         </div>
       </div>
