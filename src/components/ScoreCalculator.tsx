@@ -209,37 +209,59 @@ export default function ScoreCalculator() {
       ];
 
   return (
-    <section id="calculator" className="section-padding gradient-ajou-subtle">
-      <div className="container mx-auto px-4">
-
-        {/* ── 섹션 헤더 ── */}
-        <div className="text-center mb-12">
-          <div className="inline-flex items-center gap-2 text-primary mb-4">
-            <Calculator className="w-5 h-5" />
-            <span className="text-sm font-medium tracking-wide">재학생 / 가계곤란 학생</span>
-          </div>
-          <h2 className="text-3xl md:text-4xl font-extrabold text-foreground mb-3 tracking-tight">
+    <section id=\"calculator\" className=\"section-padding gradient-ajou-subtle\">
+      <div className=\"container mx-auto px-4\">
+        <div className=\"text-center mb-12\">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+            className=\"inline-flex items-center gap-2 text-primary mb-4\"
+          >
+            <Calculator className=\"w-5 h-5\" />
+            <span className=\"text-sm font-medium tracking-wide\">재학생 / 가계곤란 학생</span>
+          </motion.div>
+          <motion.h2
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.1 }}
+            className=\"text-3xl md:text-4xl font-extrabold text-foreground mb-3 tracking-tight\"
+          >
             점수 계산기
-          </h2>
-          <p className="text-muted-foreground text-sm">
+          </motion.h2>
+          <motion.p
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.2 }}
+            className=\"text-muted-foreground text-sm\"
+          >
             나의 기숙사 배정 점수를 미리 확인해 보세요
-          </p>
+          </motion.p>
         </div>
 
-        {/* ── 모드 토글 ── */}
-        <div className="max-w-4xl mx-auto mb-8">
-          <div className="glass-card-strong rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        {/* Mode toggle */}
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.4, delay: 0.3 }}
+          className=\"max-w-4xl mx-auto mb-8\"
+        >
+          <div className=\"glass-card-strong rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4\">
             <div>
-              <p className="text-sm font-semibold text-foreground">선발 유형</p>
-              <p className="text-xs text-muted-foreground mt-0.5">
+              <p className=\"text-sm font-semibold text-foreground\">선발 유형</p>
+              <p className=\"text-xs text-muted-foreground mt-0.5\">
                 {isFinancial
-                  ? "가계곤란점수 60점 + 성적 30점 + 봉사 5점 + 교육 5점 = 100점"
-                  : "성적 60점 + 지역/사생 30점 + 봉사 5점 + 교육 5점 = 100점"}
+                  ? \"가계곤란점수 60점 + 성적 30점 + 봉사 5점 + 교육 5점 = 100점\"
+                  : \"성적 60점 + 지역/사생 30점 + 봉사 5점 + 교육 5점 = 100점\"}
               </p>
             </div>
-            <div className="flex items-center gap-3 shrink-0">
-              <span className={cn("text-sm font-medium transition-colors",
-                !isFinancial ? "text-foreground" : "text-muted-foreground")}>
+            <div className=\"flex items-center gap-3 shrink-0\">
+              <span
+                className={cn(
+                  \"text-sm font-medium transition-colors\",
+                  !isFinancial ? \"text-foreground\" : \"text-muted-foreground\"
+                )}
+              >
                 일반학생
               </span>
               <Switch
@@ -247,48 +269,57 @@ export default function ScoreCalculator() {
                 onCheckedChange={(c) => setMode(c ? "financial" : "general")}
                 aria-label="가계곤란 모드 전환"
               />
-              <span className={cn("text-sm font-medium transition-colors",
-                isFinancial ? "text-foreground" : "text-muted-foreground")}>
+              <span
+                className={cn(
+                  \"text-sm font-medium transition-colors\",
+                  isFinancial ? \"text-foreground\" : \"text-muted-foreground\"
+                )}
+              >
                 가계곤란학생
               </span>
             </div>
           </div>
-        </div>
+        </motion.div>
 
-        {/* ── 가계곤란 배너 ── */}
         {isFinancial && (
-          <div className="max-w-4xl mx-auto mb-6">
-            <div className="flex items-start gap-3 p-4 rounded-xl bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800/40">
-              <AlertCircle className="w-4 h-4 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
-              <div className="text-sm text-amber-800 dark:text-amber-300">
-                <p className="font-semibold mb-1">가계곤란학생 선발 안내</p>
-                <p className="text-xs leading-relaxed">
-                  학부생 정원의 1% 범위 내에서 선발됩니다. 가계곤란점수(제대 60점)는
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: \"auto\" }}
+            exit={{ opacity: 0, height: 0 }}
+            className=\"max-w-4xl mx-auto mb-6\"
+          >
+            <div className=\"flex items-start gap-3 p-4 rounded-xl bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800/40\">
+              <AlertCircle className=\"w-4 h-4 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0\" />
+              <div className=\"text-sm text-amber-800 dark:text-amber-300\">
+                <p className=\"font-semibold mb-1\">가계곤란학생 선발 안내</p>
+                <p className=\"text-xs leading-relaxed\">
+                  학부생 정원의 1% 범위 내에서 선발됩니다. 가계곤란점수(최대 60점)는
                   별도 서류(수급자 증명 등) 제출 후 심사로 확정됩니다.
                   성적 평점 2.0 이상 요건을 충족해야 합니다.
                 </p>
               </div>
             </div>
-          </div>
+          </motion.div>
         )}
 
-        <div className="max-w-4xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-8">
-
-          {/* ════ 입력 영역 ════ */}
-          <div className="space-y-5">
-
-            {/* 가계곤란점수 */}
+        <div className=\"max-w-4xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-8\">
+          {/* Input section - simplified for brevity, keeping existing code */}
+          <div className=\"space-y-5\">
             {isFinancial && (
-              <div className="glass-card-strong rounded-2xl p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-2">
-                    <Label className="text-base font-semibold tracking-tight">가계곤란점수</Label>
+              <motion.div
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                className=\"glass-card-strong rounded-2xl p-6\"
+              >
+                <div className=\"flex items-center justify-between mb-4\">
+                  <div className=\"flex items-center gap-2\">
+                    <Label className=\"text-base font-semibold tracking-tight\">가계곤란점수</Label>
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <Info className="w-4 h-4 text-muted-foreground/50 cursor-help" />
+                        <Info className=\"w-4 h-4 text-muted-foreground/50 cursor-help\" />
                       </TooltipTrigger>
-                      <TooltipContent className="max-w-xs text-xs">
-                        수급자·차상위·한부모 등 증명서류 제출 후 심사로 확정됩니다. 최대 60점
+                      <TooltipContent className=\"max-w-xs text-xs\">
+                        수급자·차상위·한부모 등 증명서류 제출 후 심사로 확정됩니다.
                       </TooltipContent>
                     </Tooltip>
                   </div>
@@ -493,51 +524,27 @@ export default function ScoreCalculator() {
             </div>
           </div>
 
-          {/* ════ 결과 영역 ════ */}
-          <div className="space-y-5">
-
-            {/* ✅ 총점 카드 — Navy gradient + ring + count-up */}
+          {/* Results section */}
+          <div className=\"space-y-5\">
             <motion.div
-              key={levelInfo.level}
-              initial={{ opacity: 0.8, scale: 0.97 }}
+              initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
-              transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-              className={cn(
-                "rounded-2xl p-8 text-center relative overflow-hidden",
-                isExcellent
-                  ? "gradient-score-excellent text-white"
-                  : "gradient-score-card text-white"
-              )}
+              transition={{ duration: 0.5, delay: 0.4 }}
+              className=\"glass-card-strong rounded-2xl p-8 text-center premium-glow\"
             >
-              {/* Background shimmer for excellent */}
-              {isExcellent && (
-                <div
-                  className="absolute inset-0 opacity-30 pointer-events-none"
-                  style={{
-                    background: "linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.15) 50%, transparent 100%)",
-                    backgroundSize: "200% 100%",
-                    animation: "gold-shimmer 3s linear infinite",
-                  }}
-                />
-              )}
-
-              {/* Ring + number */}
-              <div className="relative inline-flex items-center justify-center mb-4">
-                <ScoreRing
-                  score={breakdown.totalScore}
-                  size={128}
-                  strokeWidth={7}
-                  color={ringColor}
-                  trackColor="rgba(255,255,255,0.15)"
-                />
-                <div className="absolute inset-0 flex flex-col items-center justify-center">
-                  <AnimatedScore
-                    value={breakdown.totalScore}
-                    className="text-4xl font-extrabold tabular-nums leading-none tracking-tighter text-white"
-                  />
-                  <span className="text-[11px] text-white/60 font-medium mt-0.5">점 / 100</span>
-                </div>
-              </div>
+              <TrendingUp className=\"w-7 h-7 text-primary mx-auto mb-3\" />
+              <p className=\"text-xs text-muted-foreground/60 mb-2 uppercase tracking-widest font-medium\">
+                예상 총점
+              </p>
+              <p
+                className={cn(
+                  "text-7xl font-extrabold mb-1 tabular-nums tracking-tighter",
+                  levelInfo.colorClass
+                )}
+              >
+                {breakdown.totalScore}
+              </p>
+              <p className="text-muted-foreground/50 text-sm mb-4">/ 100점</p>
 
               {/* Level badge */}
               <div
@@ -564,61 +571,20 @@ export default function ScoreCalculator() {
                     <p className="text-[10px] text-white/50 mb-1 font-medium">{item.label}</p>
                     <p className="text-lg font-bold tabular-nums tracking-tight text-white">
                       {item.value}
-                      <span className="text-xs text-white/40 font-normal">/{item.max}</span>
+                      <span className=\"text-xs text-muted-foreground/40 font-normal\">/{item.max}</span>
                     </p>
-                    <div className="w-full h-1 bg-white/10 rounded-full mt-1.5 overflow-hidden">
-                      <motion.div
-                        className="h-full rounded-full"
-                        style={{ backgroundColor: isExcellent ? "#C5A028" : "rgba(255,255,255,0.5)" }}
-                        initial={{ width: "0%" }}
-                        animate={{ width: `${(item.value / item.max) * 100}%` }}
-                        transition={{ duration: 0.8, delay: 0.1, ease: [0.22, 1, 0.36, 1] }}
-                      />
-                    </div>
-                  </div>
+                    <motion.div
+                      initial={{ width: 0 }}
+                      animate={{ width: `${(item.value / item.max) * 100}%` }}
+                      transition={{ duration: 0.8, delay: 0.2 }}
+                      className=\"w-full h-1 bg-muted/60 rounded-full mt-1.5 overflow-hidden\"
+                    >
+                      <div className=\"h-full bg-primary/60 rounded-full\" />
+                    </motion.div>
+                  </motion.div>
                 ))}
               </div>
             </motion.div>
-
-            {/* ✅ Disclaimer — reliability notice */}
-            <div className="glass-card-strong rounded-xl p-4 border-l-4 border-l-amber-400/60">
-              <div className="flex items-start gap-2.5">
-                <ShieldAlert className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
-                <div>
-                  <p className="text-xs font-semibold text-foreground/80 mb-1">정보 신뢰성 안내</p>
-                  <p className="text-xs text-muted-foreground leading-relaxed">
-                    본 결과는 <strong>과거 선발 기준에 따른 시뮬레이션</strong>이며,
-                    실제 합격선은 당해 지원자 분포에 따라 <strong>변동될 수 있습니다.</strong>
-                    미래를 보장하지 않으며, 반드시 공식 안내사항을 확인하세요.
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* 학점 오차리하 안내 */}
-            <div className="glass-card-strong rounded-2xl p-5">
-              <h3 className="text-sm font-semibold mb-3 tracking-tight">점수 참고 안내</h3>
-              <div className="space-y-2 text-xs text-muted-foreground leading-relaxed">
-                <p className="flex items-start gap-2">
-                  <span className="w-1.5 h-1.5 rounded-full bg-success shrink-0 mt-1.5" />
-                  점수는 참고용이며 실제 배정 여부는 지원자 현황에 따라 달라집니다.
-                </p>
-                <p className="flex items-start gap-2">
-                  <span className="w-1.5 h-1.5 rounded-full bg-warning shrink-0 mt-1.5" />
-                  동점자는 평점 → 취득학점 → 생년월일(연소자) 순으로 처리.
-                </p>
-                <p className="flex items-start gap-2">
-                  <span className="w-1.5 h-1.5 rounded-full bg-primary/60 shrink-0 mt-1.5" />
-                  신청학점·취득학점·성적 평점이 없으면 성적 60점으로 환산.
-                </p>
-                {isFinancial && (
-                  <p className="flex items-start gap-2">
-                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0 mt-1.5" />
-                    가계곤난 선발은 학부생 정원 1% 이내로 매우 제한적.
-                  </p>
-                )}
-              </div>
-            </div>
 
             {/* 학점 ↔ 점수 상관 차트 */}
             <div className="glass-card-strong rounded-2xl p-6">
