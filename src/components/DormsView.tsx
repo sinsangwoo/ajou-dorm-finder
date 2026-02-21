@@ -1,66 +1,62 @@
-import { useState } from "react";
-import { motion } from "framer-motion";
-import { useSearchParams, useNavigate, Link } from "react-router-dom";
+'use client';
+/**
+ * DormsView.tsx — Client Component
+ * ─────────────────────────────────────────────────────────────────────────────
+ * Migrated from react-router-dom to Next.js App Router:
+ *   - useSearchParams() / useRouter() from 'next/navigation'
+ *   - <Link href>  replaces <Link to>
+ *   - router.push() replaces navigate()
+ *
+ * Receives `dormitories` as a prop serialised from the RSC parent
+ * (src/app/dorms/page.tsx) so the filtering logic stays client-side
+ * while the data fetch is server-side.
+ *
+ * Props:
+ *   dormitories    – full list from getDormitories() RSC fetch
+ *   initialGender  – pre-populated from URL search param (optional)
+ *   initialType    – pre-populated from URL search param (optional)
+ */
+
+import { useState, useCallback }        from 'react';
+import { useSearchParams, useRouter }   from 'next/navigation';
+import Link                             from 'next/link';
+import { motion }                       from 'framer-motion';
 import {
   CheckCircle2, XCircle, AlertCircle, Building,
   Users, DoorOpen, RotateCcw, ArrowRight, SlidersHorizontal,
-} from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+} from 'lucide-react';
+import { Badge }   from '@/components/ui/badge';
+import { Button }  from '@/components/ui/button';
 import {
-  Gender,
-  StudentType,
+  type Gender,
+  type StudentType,
+  type Dormitory,
   studentTypes,
-  dormitories,
   getEligibleDormitories,
-} from "@/data/dormitoryData";
-import { getRoomTypePercentage } from "@/data/dormInfo";
-import { cn } from "@/lib/utils";
+} from '@/data/dormitoryData';
+import { getRoomTypePercentage } from '@/data/dormInfo';
+import { cn } from '@/lib/utils';
 
-// ── Dorm color themes ─────────────────────────────
+// ── Dorm colour themes ────────────────────────────────────────────────────────
 const DORM_THEMES: Record<string, { gradient: string; icon: string; accent: string }> = {
-  namje: {
-    gradient: "bg-gradient-to-br from-orange-400 via-orange-500 to-red-500",
-    icon: "bg-orange-100 dark:bg-orange-950/50",
-    accent: "text-orange-600 dark:text-orange-400",
-  },
-  yongji: {
-    gradient: "bg-gradient-to-br from-blue-400 via-blue-500 to-indigo-500",
-    icon: "bg-blue-100 dark:bg-blue-950/50",
-    accent: "text-blue-600 dark:text-blue-400",
-  },
-  hwahong: {
-    gradient: "bg-gradient-to-br from-purple-400 via-purple-500 to-pink-500",
-    icon: "bg-purple-100 dark:bg-purple-950/50",
-    accent: "text-purple-600 dark:text-purple-400",
-  },
-  gwanggyo: {
-    gradient: "bg-gradient-to-br from-emerald-400 via-emerald-500 to-teal-500",
-    icon: "bg-emerald-100 dark:bg-emerald-950/50",
-    accent: "text-emerald-600 dark:text-emerald-400",
-  },
-  international: {
-    gradient: "bg-gradient-to-br from-cyan-400 via-cyan-500 to-blue-500",
-    icon: "bg-cyan-100 dark:bg-cyan-950/50",
-    accent: "text-cyan-600 dark:text-cyan-400",
-  },
-  ilsin: {
-    gradient: "bg-gradient-to-br from-primary/80 via-primary to-primary/60",
-    icon: "bg-primary/10",
-    accent: "text-primary",
-  },
+  namje:         { gradient: 'bg-gradient-to-br from-orange-400 via-orange-500 to-red-500',     icon: 'bg-orange-100 dark:bg-orange-950/50',  accent: 'text-orange-600 dark:text-orange-400'  },
+  yongji:        { gradient: 'bg-gradient-to-br from-blue-400 via-blue-500 to-indigo-500',       icon: 'bg-blue-100 dark:bg-blue-950/50',      accent: 'text-blue-600 dark:text-blue-400'      },
+  hwahong:       { gradient: 'bg-gradient-to-br from-purple-400 via-purple-500 to-pink-500',     icon: 'bg-purple-100 dark:bg-purple-950/50',  accent: 'text-purple-600 dark:text-purple-400'  },
+  gwanggyo:      { gradient: 'bg-gradient-to-br from-emerald-400 via-emerald-500 to-teal-500',   icon: 'bg-emerald-100 dark:bg-emerald-950/50',accent: 'text-emerald-600 dark:text-emerald-400'},
+  international: { gradient: 'bg-gradient-to-br from-cyan-400 via-cyan-500 to-blue-500',         icon: 'bg-cyan-100 dark:bg-cyan-950/50',      accent: 'text-cyan-600 dark:text-cyan-400'      },
+  ilsin:         { gradient: 'bg-gradient-to-br from-primary/80 via-primary to-primary/60',      icon: 'bg-primary/10',                        accent: 'text-primary'                          },
 };
 
-// ── Subcomponent: Room Breakdown Bar ──────────────
+// ── RoomBreakdownBar ──────────────────────────────────────────────────────────
 function RoomBreakdownBar({ dormId }: { dormId: string }) {
   const p = getRoomTypePercentage(dormId);
   if (!Object.keys(p).length) return null;
 
   const segments = [
-    { key: "single", label: "1인", color: "bg-primary/80", value: p.single },
-    { key: "double", label: "2인", color: "bg-success/70", value: p.double },
-    { key: "triple", label: "3인", color: "bg-warning/70", value: p.triple },
-    { key: "quad",   label: "4인", color: "bg-muted-foreground/40", value: p.quad },
+    { key: 'single', label: '1인', color: 'bg-[#002855]/80',        value: p.single },
+    { key: 'double', label: '2인', color: 'bg-[#0057B7]/70',        value: p.double },
+    { key: 'triple', label: '3인', color: 'bg-[#C5A028]/70',        value: p.triple },
+    { key: 'quad',   label: '4인', color: 'bg-muted-foreground/40', value: p.quad   },
   ].filter((s) => s.value !== undefined && s.value > 0);
 
   return (
@@ -70,12 +66,12 @@ function RoomBreakdownBar({ dormId }: { dormId: string }) {
         {segments.map((s) => (
           <div
             key={s.key}
-            className={cn("flex items-center justify-center", s.color)}
+            className={cn('flex items-center justify-center', s.color)}
             style={{ width: `${s.value}%` }}
             title={`${s.label}실 ${s.value}%`}
           >
             {(s.value ?? 0) >= 12 && (
-              <span className="text-2xs font-bold text-white leading-none">
+              <span className="text-[10px] font-bold text-white leading-none">
                 {s.label} {s.value}%
               </span>
             )}
@@ -85,10 +81,8 @@ function RoomBreakdownBar({ dormId }: { dormId: string }) {
       <div className="flex items-center gap-3 mt-1.5 flex-wrap">
         {segments.map((s) => (
           <div key={s.key} className="flex items-center gap-1">
-            <div className={cn("w-2 h-2 rounded-full", s.color)} />
-            <span className="text-xs text-muted-foreground/60">
-              {s.label}실 {s.value}%
-            </span>
+            <div className={cn('w-2 h-2 rounded-full', s.color)} />
+            <span className="text-xs text-muted-foreground/60">{s.label}실 {s.value}%</span>
           </div>
         ))}
       </div>
@@ -96,16 +90,16 @@ function RoomBreakdownBar({ dormId }: { dormId: string }) {
   );
 }
 
-// ── Subcomponent: Enhanced Dorm Card ───────────────
+// ── DormCard ──────────────────────────────────────────────────────────────────
 interface DormCardProps {
-  dorm: (typeof dormitories)[0];
+  dorm: Dormitory;
   isEligible: boolean | null;
   index: number;
 }
 
 function DormCard({ dorm, isEligible, index }: DormCardProps) {
   const filtered = isEligible !== null;
-  const theme = DORM_THEMES[dorm.id] || DORM_THEMES.ilsin;
+  const theme    = DORM_THEMES[dorm.id] ?? DORM_THEMES.ilsin;
 
   return (
     <motion.div
@@ -114,30 +108,32 @@ function DormCard({ dorm, isEligible, index }: DormCardProps) {
       transition={{ duration: 0.5, delay: index * 0.08, ease: [0.22, 1, 0.36, 1] }}
       className="h-full"
     >
-      <Link to={`/dorms/${dorm.id}`}>
+      <Link href={`/dorms/${dorm.id}`}>
         <div
           className={cn(
-            "relative rounded-2xl overflow-hidden transition-all duration-300 h-full",
-            "glass-card-strong hover-lift group cursor-pointer",
-            filtered && !isEligible && "opacity-40 grayscale pointer-events-none"
+            'relative rounded-2xl overflow-hidden transition-all duration-300 h-full',
+            'glass-card-strong hover-lift group cursor-pointer',
+            filtered && !isEligible && 'opacity-40 grayscale pointer-events-none'
           )}
         >
           {/* Gradient header strip */}
-          <div className={cn("h-2 w-full", theme.gradient)} />
+          <div className={cn('h-2 w-full', theme.gradient)} />
 
           <div className="p-6">
             {/* Header row */}
             <div className="flex items-start justify-between mb-4">
-              <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center transition-transform group-hover:scale-110", theme.icon)}>
-                <Building className={cn("w-5 h-5", theme.accent)} />
+              <div className={cn(
+                'w-10 h-10 rounded-xl flex items-center justify-center',
+                'transition-transform group-hover:scale-110', theme.icon
+              )}>
+                <Building className={cn('w-5 h-5', theme.accent)} />
               </div>
-
               <div className="flex items-center gap-2">
                 {dorm.competitionBadge && (
                   <Badge variant="destructive" className="text-xs">{dorm.competitionBadge}</Badge>
                 )}
-                {filtered && isEligible && <CheckCircle2 className="w-5 h-5 text-success" />}
-                {filtered && !isEligible && <XCircle className="w-5 h-5 text-muted-foreground/40" />}
+                {filtered && isEligible  && <CheckCircle2 className="w-5 h-5 text-success" />}
+                {filtered && !isEligible && <XCircle      className="w-5 h-5 text-muted-foreground/40" />}
               </div>
             </div>
 
@@ -178,7 +174,9 @@ function DormCard({ dorm, isEligible, index }: DormCardProps) {
                 <Users className="w-3.5 h-3.5 text-muted-foreground/50" />
                 <span>
                   {dorm.capacity}
-                  {dorm.capacityNote && <span className="ml-1 text-muted-foreground/40 text-xs">{dorm.capacityNote}</span>}
+                  {dorm.capacityNote && (
+                    <span className="ml-1 text-muted-foreground/40 text-xs">{dorm.capacityNote}</span>
+                  )}
                 </span>
               </div>
               <div className="flex items-center gap-1.5">
@@ -187,7 +185,7 @@ function DormCard({ dorm, isEligible, index }: DormCardProps) {
               </div>
             </div>
 
-            {/* Features */}
+            {/* Feature checklist (only when eligible) */}
             {isEligible && (
               <div className="mt-4 pt-4 border-t border-border/40">
                 <ul className="text-xs text-muted-foreground space-y-1.5">
@@ -207,25 +205,46 @@ function DormCard({ dorm, isEligible, index }: DormCardProps) {
   );
 }
 
-// ── Main Component ─────────────────────────────────
-export default function DormsView() {
-  const [searchParams, setSearchParams] = useSearchParams();
-  const navigate = useNavigate();
+// ── Main export ───────────────────────────────────────────────────────────────
+interface DormsViewProps {
+  dormitories: Dormitory[];
+  initialGender?: 'male' | 'female';
+  initialType?:   string;
+}
 
-  const paramGender = searchParams.get("gender") as Gender | null;
-  const paramType = searchParams.get("type") as StudentType | null;
-  const hasFilter = Boolean(paramGender && paramType);
+export default function DormsView({
+  dormitories,
+  initialGender,
+  initialType,
+}: DormsViewProps) {
+  const router = useRouter();
+  // Next.js 15: useSearchParams returns a read-only URLSearchParams
+  const searchParams    = useSearchParams();
 
-  const eligibleIds = hasFilter ? getEligibleDormitories(paramGender!, paramType!) : null;
+  const setSearchParams = useCallback(
+    (params: Record<string, string>) => {
+      const sp = new URLSearchParams(params);
+      router.push(`/dorms?${sp.toString()}`, { scroll: false });
+    },
+    [router]
+  );
+  const clearFilter = useCallback(() => router.push('/dorms', { scroll: false }), [router]);
 
-  const genderLabel = paramGender === "male" ? "남학생" : paramGender === "female" ? "여학생" : "";
-  const typeLabel = studentTypes.find((s) => s.type === paramType)?.label ?? "";
+  const paramGender = (searchParams.get('gender') ?? initialGender ?? null) as Gender | null;
+  const paramType   = (searchParams.get('type')   ?? initialType   ?? null) as StudentType | null;
+  const hasFilter   = Boolean(paramGender && paramType);
 
-  const clearFilter = () => setSearchParams({});
+  const eligibleIds = hasFilter
+    ? getEligibleDormitories(paramGender!, paramType!)
+    : null;
 
+  const genderLabel = paramGender === 'male' ? '남학생' : paramGender === 'female' ? '여학생' : '';
+  const typeLabel   = studentTypes.find((s) => s.type === paramType)?.label ?? '';
+
+  // Filter panel state
   const [showFilterPanel, setShowFilterPanel] = useState(false);
-  const [localGender, setLocalGender] = useState<Gender | null>(paramGender);
-  const [localType, setLocalType] = useState<StudentType | null>(paramType);
+  const [localGender, setLocalGender]         = useState<Gender | null>(paramGender);
+  const [localType,   setLocalType]           = useState<StudentType | null>(paramType as StudentType | null);
 
   const applyFilter = () => {
     if (localGender && localType) {
@@ -244,7 +263,7 @@ export default function DormsView() {
 
   return (
     <div>
-      {/* Section Header */}
+      {/* Section header */}
       <div className="container mx-auto px-4 pt-10 pb-6">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -253,23 +272,30 @@ export default function DormsView() {
           className="flex flex-col sm:flex-row sm:items-end justify-between gap-4"
         >
           <div>
-            <h1 className="text-3xl md:text-4xl font-extrabold text-foreground tracking-tight mb-1">
-              {hasFilter ? "지원 가능 기숙사" : "기숙사 한눈에 보기"}
-            </h1>
+            <h2 className="text-3xl md:text-4xl font-extrabold text-foreground tracking-tight mb-1">
+              {hasFilter ? '지원 가능 기숙사' : '기숙사 한눈에 보기'}
+            </h2>
             <p className="text-muted-foreground text-sm">
-              {hasFilter ? `${genderLabel} · ${typeLabel} 기준으로 필터링된 결과입니다` : "아주대학교 6개 기숙사의 주요 정보를 비교해 보세요"}
+              {hasFilter
+                ? `${genderLabel} · ${typeLabel} 기준으로 필터링된 결과입니다`
+                : '아주대학교 6개 기숙사의 주요 정보를 비교해 보세요'
+              }
             </p>
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
             {hasFilter && (
-              <Button variant="outline" size="sm" onClick={clearFilter} className="gap-1.5 text-xs rounded-full">
+              <Button
+                variant="outline" size="sm"
+                onClick={clearFilter}
+                className="gap-1.5 text-xs rounded-full"
+              >
                 <RotateCcw className="w-3.5 h-3.5" />
                 필터 초기화
               </Button>
             )}
             <Button
-              variant={hasFilter ? "default" : "outline"}
+              variant={hasFilter ? 'default' : 'outline'}
               size="sm"
               onClick={() => setShowFilterPanel((v) => !v)}
               className="gap-1.5 text-xs rounded-full"
@@ -281,45 +307,79 @@ export default function DormsView() {
         </motion.div>
 
         {hasFilter && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex items-center gap-2 mt-3 flex-wrap">
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+            className="flex items-center gap-2 mt-3 flex-wrap"
+          >
             <span className="text-xs text-muted-foreground/60">필터:</span>
             <span className="filter-pill active text-xs">{genderLabel}</span>
             <span className="filter-pill active text-xs">{typeLabel}</span>
-            <span className="text-xs text-muted-foreground/60">· {eligibleIds?.length ?? 0}개 기숙사 지원 가능</span>
+            <span className="text-xs text-muted-foreground/60">
+              · {eligibleIds?.length ?? 0}개 기숙사 지원 가능
+            </span>
           </motion.div>
         )}
       </div>
 
       {/* Filter panel */}
       {showFilterPanel && (
-        <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="container mx-auto px-4 pb-6">
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="container mx-auto px-4 pb-6"
+        >
           <div className="glass-card-strong rounded-2xl p-5 max-w-lg">
             <p className="text-sm font-semibold mb-4 text-foreground">조건 선택</p>
+
             <div className="mb-4">
               <p className="text-xs text-muted-foreground/60 mb-2 font-medium">성별</p>
               <div className="flex gap-2">
-                {(["male", "female"] as Gender[]).map((g) => (
-                  <button key={g} onClick={() => setLocalGender(g)} className={cn("filter-pill", localGender === g && "active")}>
-                    {g === "male" ? "남학생" : "여학생"}
+                {(['male', 'female'] as Gender[]).map((g) => (
+                  <button
+                    key={g}
+                    onClick={() => setLocalGender(g)}
+                    className={`filter-pill${localGender === g ? ' active' : ''}`}
+                  >
+                    {g === 'male' ? '남학생' : '여학생'}
                   </button>
                 ))}
               </div>
             </div>
+
             <div className="mb-5">
               <p className="text-xs text-muted-foreground/60 mb-2 font-medium">신분</p>
               <div className="flex flex-wrap gap-2">
                 {studentTypes.map(({ type, label }) => (
-                  <button key={type} onClick={() => setLocalType(type)} className={cn("filter-pill", localType === type && "active")}>
+                  <button
+                    key={type}
+                    onClick={() => setLocalType(type)}
+                    className={`filter-pill${localType === type ? ' active' : ''}`}
+                  >
                     {label}
                   </button>
                 ))}
               </div>
             </div>
+
             <div className="flex items-center gap-2">
-              <Button size="sm" onClick={applyFilter} disabled={!localGender || !localType} className="rounded-full px-5 text-xs">
+              <Button
+                size="sm"
+                onClick={applyFilter}
+                disabled={!localGender || !localType}
+                className="rounded-full px-5 text-xs"
+              >
                 필터 적용 <ArrowRight className="w-3.5 h-3.5 ml-1" />
               </Button>
-              <Button variant="ghost" size="sm" onClick={() => { setLocalGender(null); setLocalType(null); clearFilter(); setShowFilterPanel(false); }} className="text-xs">
+              <Button
+                variant="ghost" size="sm"
+                onClick={() => {
+                  setLocalGender(null);
+                  setLocalType(null);
+                  clearFilter();
+                  setShowFilterPanel(false);
+                }}
+                className="text-xs"
+              >
                 초기화
               </Button>
             </div>
@@ -327,18 +387,34 @@ export default function DormsView() {
         </motion.div>
       )}
 
-      {/* Grid */}
+      {/* Card grid */}
       <div className="container mx-auto px-4 pb-10">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 max-w-5xl mx-auto">
           {sortedDorms.map((dorm, index) => (
-            <DormCard key={dorm.id} dorm={dorm} isEligible={hasFilter ? (eligibleIds?.includes(dorm.id) ?? false) : null} index={index} />
+            <DormCard
+              key={dorm.id}
+              dorm={dorm}
+              isEligible={hasFilter ? (eligibleIds?.includes(dorm.id) ?? false) : null}
+              index={index}
+            />
           ))}
         </div>
 
-        {hasFilter && paramType === "enrolled" && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5 }} className="text-center mt-10">
-            <p className="text-sm text-muted-foreground mb-3">재학생이라면 점수 계산기로 배정 점수를 미리 확인하세요</p>
-            <Button onClick={() => navigate("/calculator")} size="lg" className="rounded-full px-8 font-semibold">
+        {hasFilter && paramType === 'enrolled' && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.5 }}
+            className="text-center mt-10"
+          >
+            <p className="text-sm text-muted-foreground mb-3">
+              재학생이라면 점수 계산기로 배정 점수를 미리 확인하세요
+            </p>
+            <Button
+              onClick={() => router.push('/calculator')}
+              size="lg"
+              className="rounded-full px-8 font-semibold"
+            >
               점수 계산기로 이동 <ArrowRight className="w-4 h-4 ml-2" />
             </Button>
           </motion.div>
