@@ -2,56 +2,132 @@ name: E2E Tests (Playwright)
 
 on:
   push:
-    branches: [main, 'feature/**']
+    branches: [main, 'feature/**', 'fix/**']
   pull_request:
-    branches: [main]
+    branches: [main, 'feature/**']
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  e2e:
-    name: Playwright E2E
+  # ──────────────────────────────────────────────────────────────────────────
+  # Job 1: Verify lock file is in sync with package.json
+  # ──────────────────────────────────────────────────────────────────────────
+  lock-check:
+    name: Lock File Integrity
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 5
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
+      - name: Setup Node.js 22
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'npm'
 
+      # npm install --package-lock-only regenerates the lock without touching
+      # node_modules. If the result differs from the committed lock file,
+      # the step fails and we know the lock is stale.
+      - name: Check lock file is up-to-date
+        run: |
+          npm install --package-lock-only --legacy-peer-deps
+          git diff --exit-code package-lock.json || (
+            echo "" &&
+            echo "╔══════════════════════════════════════════════════════════════╗" &&
+            echo "║  package-lock.json is out of sync with package.json!         ║" &&
+            echo "║  Run: npm install --legacy-peer-deps                         ║" &&
+            echo "║  Then commit the updated package-lock.json                   ║" &&
+            echo "╚══════════════════════════════════════════════════════════════╝" &&
+            exit 1
+          )
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # Job 2: Full E2E test suite
+  # ──────────────────────────────────────────────────────────────────────────
+  e2e:
+    name: Playwright E2E
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    needs: lock-check
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          # Cache uses package-lock.json hash — always valid after lock-check
+          cache: 'npm'
+
+      # Use `npm install` (not `npm ci`) so that:
+      #   1. Legacy peer dep ranges don't cause ERESOLVE errors on first install
+      #   2. If lock file was just regenerated above, it installs correctly
+      # Once the repository's lock file is fully stable, this can revert to
+      # `npm ci` for reproducibility. The `lock-check` job above ensures the
+      # lock file stays in sync regardless.
       - name: Install dependencies
-        run: npm ci
+        run: npm install --legacy-peer-deps
 
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium
         # Only Chromium on CI to keep install time < 60s
         # Mobile viewports are emulated within Chromium
 
-      # ── Build the app ───────────────────────────────────────────────────
+      # ── Unit tests (fast, no browser required) ──────────────────────────
+      - name: Run unit tests
+        run: npm test
+
+      # ── Build ─────────────────────────────────────────────────────────
       - name: Build Next.js app
         run: npm run build
         env:
-          NEXT_PUBLIC_TENANT_ID: ajou
-          NEXT_PUBLIC_SITE_URL:  http://localhost:3000
-          # Supabase not required for E2E — app uses static fallback
+          NEXT_PUBLIC_TENANT_ID:  ajou
+          NEXT_PUBLIC_SITE_URL:   http://localhost:3000
+          # Supabase env vars intentionally omitted:
+          # app uses static fallback when DB not configured
 
+      # ── E2E ──────────────────────────────────────────────────────────
       - name: Run Playwright tests
         run: npx playwright test --project=chromium
         env:
-          CI: true
-          PLAYWRIGHT_BASE_URL: http://localhost:3000
+          CI:                    'true'
+          PLAYWRIGHT_BASE_URL:   http://localhost:3000
 
       - name: Upload Playwright report
         uses: actions/upload-artifact@v4
-        if: always()   # Upload even on failure
+        if: always()
         with:
-          name: playwright-report
+          name: playwright-report-${{ github.run_id }}
           path: playwright-report/
           retention-days: 14
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # Job 3: TypeScript type check (catches regressions without a full build)
+  # ──────────────────────────────────────────────────────────────────────────
+  typecheck:
+    name: TypeScript Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: lock-check
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm install --legacy-peer-deps
+
+      - name: TypeScript type check
+        run: npx tsc --noEmit
