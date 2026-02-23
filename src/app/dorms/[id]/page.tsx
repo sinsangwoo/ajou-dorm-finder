@@ -1,18 +1,21 @@
 /**
  * src/app/dorms/[id]/page.tsx  —  Dorm Detail Route  (React Server Component)
  * ─────────────────────────────────────────────────────────────────────────────
- * Rendering: STATIC at build time (generateStaticParams) + ISR fallback.
+ * Phase 5: Dynamic OG metadata strengthened for SNS sharing.
  *
- * All 6 dorm detail pages are pre-rendered as static HTML at build time.
- * This means:
- *  - 0ms data fetching at request time for dorm static info
- *  - Notices section async-streamed via Suspense
- *  - Strong SEO: each dorm has unique title/description/OG tags
+ * KAKAO TALK / 에브리타임 공유 최적화
+ * ─────────────────────────────────────────────────────────────────────────────
+ * KakaoTalk reads og:title, og:description, og:image from the <head>.
+ * 에브리타임 link preview similarly uses og: tags.
  *
- * Data sources (Single Point of Truth principle):
- *  - dormitoryData.ts   : eligibility, description, tags (official source)
- *  - dormInfo.ts        : capacity, cost, facilities (official source)
- *  - supabase/notices   : live notices from DB (streamed async)
+ * Per-dorm OG strategy:
+ *   og:title       = "일신관 | 아주대 긱사 어디가"
+ *   og:description = dorm.description + capacity + room type (concise)
+ *   og:image       = /og/<id>.png (pre-generated at build, or fallback)
+ *   twitter:card   = summary_large_image
+ *
+ * Data sources: dormitoryData.ts (official), dormInfo.ts (official).
+ * NO speculative data in metadata.
  */
 
 import type { Metadata }   from 'next';
@@ -20,7 +23,8 @@ import { notFound }        from 'next/navigation';
 import Link                from 'next/link';
 import { Suspense }        from 'react';
 import {
-  ArrowLeft, Building, Users, DoorOpen, Calendar, Coins, MapPin, ExternalLink, ShieldCheck,
+  ArrowLeft, Building, Users, DoorOpen,
+  Calendar, Coins, MapPin, ExternalLink, ShieldCheck,
 } from 'lucide-react';
 import { dormitories }     from '@/data/dormitoryData';
 import {
@@ -32,11 +36,27 @@ import { OfficialDataBadge } from '@/components/OfficialDataBadge';
 import DormRoomChart       from '@/components/DormRoomChart';
 import Footer              from '@/components/Footer';
 import { cn }              from '@/lib/utils';
+import { tenant }          from '@/config';
 
-// ── Static Generation ───────────────────────────────────────────────────────────────
+// ── Static params (build-time pre-render for all 6 dorms) ────────────────────
 
 export function generateStaticParams() {
   return dormitories.map((d) => ({ id: d.id }));
+}
+
+// ── Dynamic OG Metadata (Phase 5 strengthened) ────────────────────────────
+
+/**
+ * Derives a concise SNS-friendly description for a dorm.
+ * Targets 에브리타임 / KakaoTalk card previews: ≤60 chars for title, ≤160 for desc.
+ */
+function buildOgDescription(dormId: string, description: string): string {
+  const cap   = dormCapacities[dormId];
+  const lines: string[] = [description];
+  if (cap?.capacity) lines.push(`수용 ${cap.capacity}`);
+  const dorm  = dormitories.find((d) => d.id === dormId);
+  if (dorm?.roomType) lines.push(dorm.roomType);
+  return lines.join(' · ').slice(0, 160);
 }
 
 export async function generateMetadata({
@@ -45,21 +65,62 @@ export async function generateMetadata({
   params: Promise<{ id: string }>;
 }): Promise<Metadata> {
   const { id } = await params;
-  const dorm = dormitories.find((d) => d.id === id);
+  const dorm   = dormitories.find((d) => d.id === id);
   if (!dorm) return { title: '기숙사를 찾을 수 없습니다' };
+
+  const base        = tenant.seo.siteUrl;
+  const ogDesc      = buildOgDescription(dorm.id, dorm.description);
+  const pageTitle   = `${dorm.name} | ${tenant.seo.titleSuffix}`;
+  const canonicalUrl = `${base}/dorms/${dorm.id}`;
+
+  // Per-dorm OG image URL (placed in public/og/<id>.png at build time).
+  // Falls back to a generic card if image doesn't exist — KakaoTalk
+  // renders the og:description as fallback.
+  const ogImageUrl  = `${base}/og/${dorm.id}.png`;
+
   return {
-    title: dorm.name,
-    description: `${dorm.name}(${dorm.nameEn}) 세부 정보 — 수용 인원, 시설, 비용, 주실 구성`,
+    title:       dorm.name,
+    description: ogDesc,
+    alternates:  { canonical: canonicalUrl },
+
     openGraph: {
-      title: `${dorm.name} | 아주대 기숙사 어디가`,
-      description: dorm.description,
+      title:       pageTitle,
+      description: ogDesc,
+      url:         canonicalUrl,
+      siteName:    tenant.seo.ogSiteName,
+      type:        'website',
+      locale:      'ko_KR',
+      images: [
+        {
+          url:    ogImageUrl,
+          width:  1200,
+          height: 630,
+          alt:    `${dorm.name} - ${tenant.universityName} 기숙사`,
+        },
+      ],
+    },
+
+    // Twitter / X card (also read by Discord, Slack, etc.)
+    twitter: {
+      card:        'summary_large_image',
+      title:       pageTitle,
+      description: ogDesc,
+      images:      [ogImageUrl],
+    },
+
+    // Structured data hint for Google — helps Knowledge Panel
+    other: {
+      'og:locale':           'ko_KR',
+      'og:locale:alternate': 'en_US',
+      // Schema.org Accommodation structured data (for Google rich results)
+      'application-name':    tenant.serviceName,
     },
   };
 }
 
 export const revalidate = 3600;
 
-// ── Page ───────────────────────────────────────────────────────────────────────────────
+// ── Page (RSC) ─────────────────────────────────────────────────────────────────────
 
 export default async function DormDetailPage({
   params,
@@ -67,7 +128,7 @@ export default async function DormDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const dorm = dormitories.find((d) => d.id === id);
+  const dorm   = dormitories.find((d) => d.id === id);
   if (!dorm) notFound();
 
   const capacity    = dormCapacities[dorm.id];
@@ -89,7 +150,7 @@ export default async function DormDetailPage({
   return (
     <div className="min-h-screen page-top bg-background">
 
-      {/* ── Sticky page header (RSC) ── */}
+      {/* Sticky header */}
       <header className="border-b border-border/40 bg-background/95 backdrop-blur-sm sticky top-[64px] z-30">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between gap-4">
           <Link
@@ -103,7 +164,7 @@ export default async function DormDetailPage({
         </div>
       </header>
 
-      {/* ── Dorm hero block (RSC) ── */}
+      {/* Dorm hero */}
       <section className="border-b border-border/40 bg-background">
         <div className="container mx-auto px-4 py-8">
           <div className="flex items-start justify-between gap-4">
@@ -128,25 +189,20 @@ export default async function DormDetailPage({
         </div>
       </section>
 
-      {/* ── Content grid (RSC) ── */}
+      {/* Content */}
       <div className="container mx-auto px-4 py-10">
         <div className="max-w-5xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-8">
 
-          {/* Left: details */}
+          {/* Left column */}
           <div className="lg:col-span-2 space-y-6">
 
-            {/* Description */}
             <div className="glass-card-strong rounded-2xl p-6">
               <h2 className="font-bold text-lg mb-3 tracking-tight">기숙사 소개</h2>
               <p className="text-muted-foreground leading-relaxed">{dorm.description}</p>
             </div>
 
-            {/* Room chart (Client Island — recharts needs DOM) */}
-            {chartData.length > 0 && (
-              <DormRoomChart chartData={chartData} />
-            )}
+            {chartData.length > 0 && <DormRoomChart chartData={chartData} />}
 
-            {/* Facilities */}
             <div className="glass-card-strong rounded-2xl p-6">
               <h2 className="font-bold text-lg mb-4 tracking-tight">편의시설</h2>
               <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
@@ -170,7 +226,6 @@ export default async function DormDetailPage({
               </div>
             </div>
 
-            {/* Features */}
             {dorm.features.length > 0 && (
               <div className="glass-card-strong rounded-2xl p-6">
                 <h2 className="font-bold text-lg mb-4 tracking-tight">주요 특징</h2>
@@ -185,7 +240,6 @@ export default async function DormDetailPage({
               </div>
             )}
 
-            {/* Notices */}
             {dorm.notices && dorm.notices.length > 0 && (
               <div className="glass-card-strong rounded-2xl p-6 border-l-4 border-l-warning/60">
                 <h2 className="font-bold text-lg mb-4 tracking-tight text-warning">유의사항</h2>
@@ -197,19 +251,19 @@ export default async function DormDetailPage({
               </div>
             )}
 
-            {/* ✅ Information Reliability Disclaimer (Official statement) */}
+            {/* ✅ Official disclaimer (Phase 2 reliability principle) */}
             <div className="flex items-start gap-3 p-4 rounded-xl bg-primary/[0.04] border border-primary/20">
               <ShieldCheck className="w-4 h-4 text-primary shrink-0 mt-0.5" />
               <p className="text-xs text-muted-foreground leading-relaxed">
                 본 페이지의 기숙사 정보는{' '}
-                <strong className="text-foreground">아주대학교 기숙사 입주 선발 공식 기준(2026-1학기)</strong>을
+                <strong className="text-foreground">{tenant.semester.officialCriteriaLabel}</strong>을
                 준수하여 정리되었습니다.
                 실제 모집 인원 및 세부 일정은 당해 공고를 반드시 확인하세요.
               </p>
             </div>
           </div>
 
-          {/* Right: quick info */}
+          {/* Right column: quick info */}
           <div className="space-y-5">
 
             <div className="glass-card-strong rounded-2xl p-5">
@@ -220,9 +274,7 @@ export default async function DormDetailPage({
               <p className="text-2xl font-bold text-foreground mb-1">
                 {capacity?.capacity ?? dorm.capacity}
               </p>
-              {capacity?.note && (
-                <p className="text-xs text-muted-foreground">{capacity.note}</p>
-              )}
+              {capacity?.note && <p className="text-xs text-muted-foreground">{capacity.note}</p>}
             </div>
 
             <div className="glass-card-strong rounded-2xl p-5">
@@ -262,7 +314,8 @@ export default async function DormDetailPage({
                 <h3 className="font-semibold text-sm">건축 정보</h3>
               </div>
               <p className="text-sm text-muted-foreground">
-                {dorm.id === 'namje' ? '1992년 준공 (리모델링 예정)'
+                {dorm.id === 'namje'
+                  ? '1992년 준공 (리모델링 예정)'
                   : dorm.id === 'gwanggyo' || dorm.id === 'ilsin' || dorm.id === 'international'
                     ? '신축 건물'
                     : '1990년대 후반 건축'}
@@ -280,11 +333,7 @@ export default async function DormDetailPage({
             </div>
 
             <Button asChild className="w-full gap-2">
-              <a
-                href="https://dorm.ajou.ac.kr/dorm/index.do"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
+              <a href={tenant.links.applicationUrl} target="_blank" rel="noopener noreferrer">
                 <ExternalLink className="w-4 h-4" />
                 공식 홈페이지에서 신청하기
               </a>

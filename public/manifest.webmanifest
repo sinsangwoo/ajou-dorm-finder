@@ -1,0 +1,48 @@
+{
+  "name": "아주대 긱사 어디가",
+  "short_name": "긱사어디가",
+  "description": "아주대학교 기숙사 6개동 정보 비교 및 배정 점수 계산기",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#002855",
+  "theme_color": "#002855",
+  "lang": "ko",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "type": "image/svg+xml",
+      "sizes": "any",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/favicon-192.png",
+      "type": "image/png",
+      "sizes": "192x192"
+    },
+    {
+      "src": "/favicon-512.png",
+      "type": "image/png",
+      "sizes": "512x512"
+    }
+  ],
+  "categories": ["education", "utilities"],
+  "shortcuts": [
+    {
+      "name": "점수 계산기",
+      "url": "/calculator",
+      "description": "기숙사 배정 점수 계산"
+    },
+    {
+      "name": "기숙사 목록",
+      "url": "/dorms",
+      "description": "6개 기숙사 비교"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/og/default.png",
+      "sizes": "1200x630",
+      "type": "image/png"
+    }
+  ]
+}
