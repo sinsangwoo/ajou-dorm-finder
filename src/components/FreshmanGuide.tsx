@@ -1,3 +1,5 @@
+"use client";
+
 import { GraduationCap, MapPin, Trophy, ChevronDown, ChevronUp } from "lucide-react";
 import { distanceRegions, tieBreakRules } from "@/data/dormitoryData";
 import { useState } from "react";

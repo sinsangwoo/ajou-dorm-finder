@@ -4,14 +4,17 @@ import type { NextConfig } from 'next';
  * Next.js 15 App Router Configuration
  * ─────────────────────────────────────────────────────────────────────────────
  * Key decisions:
- *  - output: 'standalone'  →  Docker-friendly production build
- *  - reactStrictMode: true →  Detect side-effects / double-renders in dev
- *  - experimental.ppr      →  Partial Pre-Rendering (Next.js 15 opt-in)
- *    Allows static shell + streaming RSC segments for sub-1s LCP
+ * - output: 'standalone'  →  Docker-friendly production build
+ * - reactStrictMode: true →  Detect side-effects / double-renders in dev
+ * - cacheComponents: true →  Partial Pre-Rendering (Updated for Next.js 16)
+ * Allows static shell + streaming RSC segments for sub-1s LCP
  */
 const nextConfig: NextConfig = {
   output: 'standalone',
   reactStrictMode: true,
+
+  // [수정] experimental 안에 있던 ppr이 이제 최상위의 cacheComponents로 이동했습니다.
+  cacheComponents: true,
 
   // ── Image optimisation ──────────────────────────────────────────────────────
   images: {
@@ -24,10 +27,6 @@ const nextConfig: NextConfig = {
 
   // ── Experimental ────────────────────────────────────────────────────────────
   experimental: {
-    // Partial Pre-Rendering: static shell streamed immediately,
-    // dynamic segments (e.g. notices from Supabase) fill in async.
-    // Enable per-route with `export const experimental_ppr = true`
-    ppr: 'incremental',
 
     // Optimise server component import tree-shaking
     optimizePackageImports: [

@@ -19,12 +19,6 @@ import NoticeSection      from '@/components/NoticeSection';
 import Footer             from '@/components/Footer';
 import { NoticeSkeleton } from '@/components/ui/skeletons';
 
-// Enable Partial Pre-Rendering for this route (Next.js 15 PPR)
-export const experimental_ppr = true;
-
-// Revalidate static content every 1 hour (ISR)
-export const revalidate = 3600;
-
 export default function HomePage() {
   return (
     <main className="min-h-screen">

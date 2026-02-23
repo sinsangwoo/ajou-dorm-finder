@@ -57,7 +57,6 @@ export async function generateMetadata({
   };
 }
 
-export const revalidate = 3600;
 
 // ── Page ───────────────────────────────────────────────────────────────────────────────
 

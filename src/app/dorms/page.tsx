@@ -34,9 +34,6 @@ export const metadata: Metadata = {
   },
 };
 
-// ISR: rebuild every hour, or on-demand via revalidatePath()
-export const revalidate = 3600;
-
 interface PageProps {
   searchParams: Promise<{ gender?: string; type?: string }>;
 }
