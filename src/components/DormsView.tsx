@@ -2,19 +2,12 @@
 /**
  * DormsView.tsx — Client Component
  * ─────────────────────────────────────────────────────────────────────────────
- * Migrated from react-router-dom to Next.js App Router:
- *   - useSearchParams() / useRouter() from 'next/navigation'
- *   - <Link href>  replaces <Link to>
- *   - router.push() replaces navigate()
+ * [TS Fix] useSearchParams() possibly null:
+ *   Next.js App Router에서 useSearchParams()는
+ *   ReadonlyURLSearchParams | null 을 반환할 수 있다.
+ *   .get() 호출 전 optional chaining (searchParams?.get(...)) 로 null guard.
  *
- * Receives `dormitories` as a prop serialised from the RSC parent
- * (src/app/dorms/page.tsx) so the filtering logic stays client-side
- * while the data fetch is server-side.
- *
- * Props:
- *   dormitories    – full list from getDormitories() RSC fetch
- *   initialGender  – pre-populated from URL search param (optional)
- *   initialType    – pre-populated from URL search param (optional)
+ * 나머지 로직은 변경 없음.
  */
 
 import { useState, useCallback }        from 'react';
@@ -116,11 +109,9 @@ function DormCard({ dorm, isEligible, index }: DormCardProps) {
             filtered && !isEligible && 'opacity-40 grayscale pointer-events-none'
           )}
         >
-          {/* Gradient header strip */}
           <div className={cn('h-2 w-full', theme.gradient)} />
 
           <div className="p-6">
-            {/* Header row */}
             <div className="flex items-start justify-between mb-4">
               <div className={cn(
                 'w-10 h-10 rounded-xl flex items-center justify-center',
@@ -137,11 +128,9 @@ function DormCard({ dorm, isEligible, index }: DormCardProps) {
               </div>
             </div>
 
-            {/* Name */}
             <h3 className="text-lg font-bold text-foreground mb-0.5 tracking-tight">{dorm.name}</h3>
             <p className="text-xs text-muted-foreground/50 mb-3 font-medium">{dorm.nameEn}</p>
 
-            {/* Tags */}
             <div className="flex flex-wrap gap-1.5 mb-4">
               {dorm.tags.map((tag) => (
                 <span key={tag} className="text-xs px-2.5 py-0.5 rounded-full bg-primary/[0.07] text-primary font-medium">
@@ -150,13 +139,10 @@ function DormCard({ dorm, isEligible, index }: DormCardProps) {
               ))}
             </div>
 
-            {/* Description */}
             <p className="text-sm text-muted-foreground mb-4 leading-relaxed">{dorm.description}</p>
 
-            {/* Room breakdown */}
             <RoomBreakdownBar dormId={dorm.id} />
 
-            {/* Notices */}
             {dorm.notices && dorm.notices.length > 0 && (
               <div className="mb-4 p-3 bg-warning/[0.06] rounded-xl border border-warning/20">
                 {dorm.notices.map((notice, idx) => (
@@ -168,7 +154,6 @@ function DormCard({ dorm, isEligible, index }: DormCardProps) {
               </div>
             )}
 
-            {/* Stats row */}
             <div className="flex items-center gap-4 text-xs text-muted-foreground border-t border-border/40 pt-4">
               <div className="flex items-center gap-1.5">
                 <Users className="w-3.5 h-3.5 text-muted-foreground/50" />
@@ -185,7 +170,6 @@ function DormCard({ dorm, isEligible, index }: DormCardProps) {
               </div>
             </div>
 
-            {/* Feature checklist (only when eligible) */}
             {isEligible && (
               <div className="mt-4 pt-4 border-t border-border/40">
                 <ul className="text-xs text-muted-foreground space-y-1.5">
@@ -218,8 +202,10 @@ export default function DormsView({
   initialType,
 }: DormsViewProps) {
   const router = useRouter();
-  // Next.js 15: useSearchParams returns a read-only URLSearchParams
-  const searchParams    = useSearchParams();
+
+  // [TS Fix] useSearchParams() returns ReadonlyURLSearchParams | null
+  // Optional chaining on every .get() call.
+  const searchParams = useSearchParams();
 
   const setSearchParams = useCallback(
     (params: Record<string, string>) => {
@@ -230,8 +216,9 @@ export default function DormsView({
   );
   const clearFilter = useCallback(() => router.push('/dorms', { scroll: false }), [router]);
 
-  const paramGender = (searchParams.get('gender') ?? initialGender ?? null) as Gender | null;
-  const paramType   = (searchParams.get('type')   ?? initialType   ?? null) as StudentType | null;
+  // [TS Fix] searchParams?.get() instead of searchParams.get()
+  const paramGender = (searchParams?.get('gender') ?? initialGender ?? null) as Gender | null;
+  const paramType   = (searchParams?.get('type')   ?? initialType   ?? null) as StudentType | null;
   const hasFilter   = Boolean(paramGender && paramType);
 
   const eligibleIds = hasFilter
@@ -241,7 +228,6 @@ export default function DormsView({
   const genderLabel = paramGender === 'male' ? '남학생' : paramGender === 'female' ? '여학생' : '';
   const typeLabel   = studentTypes.find((s) => s.type === paramType)?.label ?? '';
 
-  // Filter panel state
   const [showFilterPanel, setShowFilterPanel] = useState(false);
   const [localGender, setLocalGender]         = useState<Gender | null>(paramGender);
   const [localType,   setLocalType]           = useState<StudentType | null>(paramType as StudentType | null);
@@ -263,7 +249,6 @@ export default function DormsView({
 
   return (
     <div>
-      {/* Section header */}
       <div className="container mx-auto px-4 pt-10 pb-6">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -321,7 +306,6 @@ export default function DormsView({
         )}
       </div>
 
-      {/* Filter panel */}
       {showFilterPanel && (
         <motion.div
           initial={{ opacity: 0, y: -10 }}
@@ -387,7 +371,6 @@ export default function DormsView({
         </motion.div>
       )}
 
-      {/* Card grid */}
       <div className="container mx-auto px-4 pb-10">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 max-w-5xl mx-auto">
           {sortedDorms.map((dorm, index) => (
