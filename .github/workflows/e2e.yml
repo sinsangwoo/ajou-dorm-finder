@@ -11,93 +11,65 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # ──────────────────────────────────────────────────────────────────────────
-  # Job 1: Verify lock file is in sync with package.json
-  # ──────────────────────────────────────────────────────────────────────────
+  # ── Job 1: Lock file integrity check ──────────────────────────────────────
   lock-check:
     name: Lock File Integrity
     runs-on: ubuntu-latest
     timeout-minutes: 5
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js 22
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: '23'
           cache: 'npm'
-
-      # npm install --package-lock-only regenerates the lock without touching
-      # node_modules. If the result differs from the committed lock file,
-      # the step fails and we know the lock is stale.
-      - name: Check lock file is up-to-date
+      - name: Verify lock is in sync with package.json
         run: |
           npm install --package-lock-only --legacy-peer-deps
           git diff --exit-code package-lock.json || (
             echo "" &&
-            echo "╔══════════════════════════════════════════════════════════════╗" &&
-            echo "║  package-lock.json is out of sync with package.json!         ║" &&
-            echo "║  Run: npm install --legacy-peer-deps                         ║" &&
-            echo "║  Then commit the updated package-lock.json                   ║" &&
-            echo "╚══════════════════════════════════════════════════════════════╝" &&
+            echo "╔════════════════════════════════════════════════════╗" &&
+            echo "║ package-lock.json 이 package.json 과 다릅니다!         ║" &&
+            echo "║ 로컈에서 실행: npm install --legacy-peer-deps      ║" &&
+            echo "║ 그 후: git add package-lock.json && git push      ║" &&
+            echo "╚════════════════════════════════════════════════════╝" &&
             exit 1
           )
 
-  # ──────────────────────────────────────────────────────────────────────────
-  # Job 2: Full E2E test suite
-  # ──────────────────────────────────────────────────────────────────────────
+  # ── Job 2: E2E test suite ────────────────────────────────────────────
   e2e:
     name: Playwright E2E
     runs-on: ubuntu-latest
     timeout-minutes: 25
     needs: lock-check
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js 22
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
-          node-version: '22'
-          # Cache uses package-lock.json hash — always valid after lock-check
+          node-version: '23'
           cache: 'npm'
 
-      # Use `npm install` (not `npm ci`) so that:
-      #   1. Legacy peer dep ranges don't cause ERESOLVE errors on first install
-      #   2. If lock file was just regenerated above, it installs correctly
-      # Once the repository's lock file is fully stable, this can revert to
-      # `npm ci` for reproducibility. The `lock-check` job above ensures the
-      # lock file stays in sync regardless.
+      # npm install: lock 파일이 유효하면 그대로, 아니면 재체계
+      # --legacy-peer-deps: React 19 범위 선언 안한 패키지와의 ERESOLVE 방지
       - name: Install dependencies
         run: npm install --legacy-peer-deps
 
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium
-        # Only Chromium on CI to keep install time < 60s
-        # Mobile viewports are emulated within Chromium
 
-      # ── Unit tests (fast, no browser required) ──────────────────────────
-      - name: Run unit tests
+      - name: Unit tests (vitest)
         run: npm test
 
-      # ── Build ─────────────────────────────────────────────────────────
-      - name: Build Next.js app
+      - name: Build (Next.js 16 canary)
         run: npm run build
         env:
-          NEXT_PUBLIC_TENANT_ID:  ajou
-          NEXT_PUBLIC_SITE_URL:   http://localhost:3000
-          # Supabase env vars intentionally omitted:
-          # app uses static fallback when DB not configured
+          NEXT_PUBLIC_TENANT_ID: ajou
+          NEXT_PUBLIC_SITE_URL:  http://localhost:3000
 
-      # ── E2E ──────────────────────────────────────────────────────────
-      - name: Run Playwright tests
+      - name: E2E tests
         run: npx playwright test --project=chromium
         env:
-          CI:                    'true'
-          PLAYWRIGHT_BASE_URL:   http://localhost:3000
+          CI:                   'true'
+          PLAYWRIGHT_BASE_URL:  http://localhost:3000
 
       - name: Upload Playwright report
         uses: actions/upload-artifact@v4
@@ -107,27 +79,19 @@ jobs:
           path: playwright-report/
           retention-days: 14
 
-  # ──────────────────────────────────────────────────────────────────────────
-  # Job 3: TypeScript type check (catches regressions without a full build)
-  # ──────────────────────────────────────────────────────────────────────────
+  # ── Job 3: TypeScript check ────────────────────────────────────────────
   typecheck:
     name: TypeScript Check
     runs-on: ubuntu-latest
     timeout-minutes: 10
     needs: lock-check
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js 22
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: '23'
           cache: 'npm'
-
       - name: Install dependencies
         run: npm install --legacy-peer-deps
-
-      - name: TypeScript type check
+      - name: Type check
         run: npx tsc --noEmit
