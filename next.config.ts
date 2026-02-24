@@ -3,26 +3,11 @@ import type { NextConfig } from 'next';
 /**
  * next.config.ts — Phase 5 (Production Hardened)
  * ─────────────────────────────────────────────────────────────────────────────
- *
- * SECURITY HEADERS
- * ─────────────────────────────────────────────────────────────────────────────
- * All security headers are applied to EVERY response via the headers()
- * function. Vercel also supports these via vercel.json, but colocating
- * them in next.config.ts ensures they're version-controlled and apply
- * in any deployment environment (Docker, self-hosted, etc.).
- *
- * CSP STRATEGY
- * ─────────────────────────────────────────────────────────────────────────────
- * We intentionally allow 'unsafe-inline' for styles because:
- *   1. Tailwind generates inline styles for dynamic values
- *   2. Framer Motion adds inline transform/opacity styles at runtime
- *   3. next-themes injects a class-switch script (requires 'unsafe-inline')
- *
- * Scripts are locked to 'self' + trusted CDNs only.
- * No external script injection is possible without updating this file.
- *
- * UPGRADE PATH: Replace 'unsafe-inline' for scripts with a nonce-based
- * CSP once Next.js middleware-based nonce injection is production-stable.
+ * Key decisions:
+ * - output: 'standalone'  →  Docker-friendly production build
+ * - reactStrictMode: true →  Detect side-effects / double-renders in dev
+ * - cacheComponents: true →  Partial Pre-Rendering (Updated for Next.js 16)
+ * Allows static shell + streaming RSC segments for sub-1s LCP
  */
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://ajou-dorm-finder.vercel.app';
@@ -124,25 +109,10 @@ const nextConfig: NextConfig = {
   output: 'standalone',
   reactStrictMode: true,
 
-  // ── Security headers (applied to all routes) ────────────────────────────────
-  async headers() {
-    return [
-      {
-        source: '/(.*)',
-        headers: securityHeaders,
-      },
-      // API routes: stricter — no-store + same headers
-      {
-        source: '/api/(.*)',
-        headers: [
-          ...securityHeaders,
-          { key: 'Cache-Control', value: 'no-store, max-age=0' },
-        ],
-      },
-    ];
-  },
+  // [수정] experimental 안에 있던 ppr이 이제 최상위의 cacheComponents로 이동했습니다.
+  cacheComponents: true,
 
-  // ── Image optimisation ──────────────────────────────────────────────────────────
+  // ── Image optimisation ──────────────────────────────────────────────────────
   images: {
     formats: ['image/avif', 'image/webp'],  // AVIF first (50% smaller than WebP)
     remotePatterns: [
@@ -158,7 +128,8 @@ const nextConfig: NextConfig = {
 
   // ── Experimental ───────────────────────────────────────────────────────────────
   experimental: {
-    ppr: 'incremental',
+
+    // Optimise server component import tree-shaking
     optimizePackageImports: [
       'lucide-react',
       'recharts',

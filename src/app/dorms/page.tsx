@@ -36,14 +36,6 @@ export const metadata: Metadata = {
   },
 };
 
-// ISR: rebuild every hour, or on-demand via revalidatePath()
-export const revalidate = 3600;
-
-// ── Page props ───────────────────────────────────────────────────────────────────────
-// Next.js 15: searchParams is typed as Promise<...> for async page components.
-// Using a plain `{ gender?: string; type?: string }` without Promise would
-// be wrong and cause a TypeScript error:
-//   Argument of type 'Promise<...>' is not assignable to parameter...
 interface PageProps {
   searchParams: Promise<{ gender?: string; type?: string }>;
 }

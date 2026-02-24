@@ -1,4 +1,4 @@
-import { Link } from "react-router-dom";
+import Link from "next/link";
 import { ExternalLink, ArrowRight } from "lucide-react";
 import { DORM_HOMEPAGE, DORM_NOTICE_PAGE } from "@/data/dormInfo";
 
@@ -76,7 +76,7 @@ export default function Footer() {
             {NAV_LINKS.map(({ href, label }) => (
               <Link
                 key={href}
-                to={href}
+                href={href}
                 className="text-xs text-muted-foreground/60 hover:text-muted-foreground transition-colors"
               >
                 {label}

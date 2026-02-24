@@ -1,5 +1,7 @@
+"use client";
+
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useRouter } from "next/navigation";
 import { Building2, Users, ArrowRight, Sparkles, ChevronDown } from "lucide-react";
 import { Gender, StudentType, studentTypes } from "@/data/dormitoryData";
 import { cn } from "@/lib/utils";
@@ -11,14 +13,14 @@ interface HeroSectionProps {
 const HeroSection = ({ onCategorySelect }: HeroSectionProps) => {
   const [selectedGender, setSelectedGender] = useState<Gender | null>(null);
   const [hoveredType, setHoveredType] = useState<StudentType | null>(null);
-  const navigate = useNavigate();
+  const router = useRouter();
 
   const handleTypeSelect = (gender: Gender, type: StudentType) => {
     if (onCategorySelect) {
       onCategorySelect(gender, type);
     } else {
       // Navigate to dorms page with filter params
-      navigate(`/dorms?gender=${gender}&type=${type}`);
+      router.push(`/dorms?gender=${gender}&type=${type}`);
     }
   };
 
@@ -157,14 +159,14 @@ const HeroSection = ({ onCategorySelect }: HeroSectionProps) => {
         {/* Quick action links */}
         <div className="mt-8 flex items-center gap-6 animate-fade-in-up opacity-0 stagger-4">
           <button
-            onClick={() => navigate("/calculator")}
+            onClick={() => router.push("/calculator")}
             className="text-white/50 hover:text-white/80 text-xs font-medium flex items-center gap-1.5 transition-colors"
           >
             <span>점수 계산기</span>
             <ArrowRight className="w-3 h-3" />
           </button>
           <button
-            onClick={() => navigate("/dorms")}
+            onClick={() => router.push("/dorms")}
             className="text-white/50 hover:text-white/80 text-xs font-medium flex items-center gap-1.5 transition-colors"
           >
             <span>기숙사 전체 보기</span>
