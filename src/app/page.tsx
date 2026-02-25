@@ -1,15 +1,15 @@
 /**
  * src/app/page.tsx  —  Home Route  (React Server Component)
  * ─────────────────────────────────────────────────────────────────────────────
- * Rendering strategy:
- *   - Page shell (HeroSection, FreshmanGuide) = STATIC (prerendered at build)
- *   - NoticeSection = wrapped in <Suspense> for async Supabase data
- *   - Footer = STATIC
+ * [TS Fix] @ts-expect-error 제거:
+ *   Next.js 16 canary에서 async React Server Component 타입이
+ *   공식 지원되므로 @ts-expect-error 지시어가 더 이상 필요 없음.
+ *   unused @ts-expect-error는 TS2578 에러를 발생시킴.
  *
- * This gives us:
- *   - Time to First Byte (TTFB) ≈ CDN edge latency (sub-100ms)
- *   - Largest Contentful Paint (LCP) < 1s (hero painted before JS loads)
- *   - Notices stream in without blocking hero paint
+ * Rendering strategy:
+ *   - HeroSection, FreshmanGuide = STATIC (prerendered at build)
+ *   - NoticeSection = Suspense 스트리밍
+ *   - Footer = STATIC
  */
 
 import { Suspense }       from 'react';
@@ -26,10 +26,9 @@ export default function HomePage() {
       <HeroSection />
       <FreshmanGuide />
 
-      {/* ── DYNAMIC: streamed from server after static shell is sent ── */}
-      {/* Suspense boundary shows skeleton until async notices load */}
+      {/* ── DYNAMIC: streamed after static shell ── */}
+      {/* [TS Fix] @ts-expect-error 제거 — Next.js 16에서 async RSC 타입 정상 지원 */}
       <Suspense fallback={<NoticeSkeleton />}>
-        {/* @ts-expect-error Server Component with async is valid in Next.js 15 */}
         <NoticeSection />
       </Suspense>
 
