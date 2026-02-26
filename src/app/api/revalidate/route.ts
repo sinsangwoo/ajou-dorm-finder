@@ -3,20 +3,30 @@
  * ─────────────────────────────────────────────────────────────────────────────
  * On-demand ISR revalidation webhook.
  *
- * [TS Fix] revalidateTag / revalidatePath 시그니처 정리:
- *   Next.js 16 canary 기준:
- *     revalidateTag(tag: string): void           — 1개 인자
- *     revalidatePath(path: string, type?: 'page' | 'layout'): void
+ * [TS Fix] revalidateTag 시그니쳐 — Next.js 16 canary 확정 방법:
  *
- *   이전 커밋에서 body에 type?: RevalidateType 을 추가했는데
- *   revalidateTag는 두 번째 인자를 받지 않으므로 제거.
- *   revalidatePath의 두 번째 인자는 정상 유지.
+ *   공식 타입 정의 (next.js/packages/next/src/server/web/spec-extension/revalidate.ts):
+ *     revalidateTag(
+ *       tag:     string,
+ *       profile?: string | { expire?: number }
+ *     ): void
+ *
+ *   - profile은 문서에는 optional이라 표시되어 있으나,
+ *     일부 canary 빌드에서는 두 번째 인자를 요구함.
+ *   - 웹훅/외부 호출에서는 { expire: 0 } 패턴 권장
+ *     (Next.js 공식 도표 인용: “For webhooks or third-party services that need
+ *     immediate expiration, you can pass { expire: 0 }”)
+ *
+ *   - body에서 expire 값을 받아 유연하게 전달; 미입력 시 expire: 0 (webhook 기본값)
  *
  * Security: Bearer token check against REVALIDATION_SECRET env var.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { revalidatePath, revalidateTag } from 'next/cache';
+
+// Next.js 16 canary revalidateTag 두 번째 인자의 정확한 타입
+type TagProfile = string | { expire?: number };
 
 export async function POST(req: NextRequest) {
   // ── Auth check ─────────────────────────────────────────────────────────
@@ -28,10 +38,15 @@ export async function POST(req: NextRequest) {
   }
 
   // ── Parse body ───────────────────────────────────────────────────────
-  // [TS Fix] body 타입을 명시적으로 정의해 타입 추론 오류 방지
-  let body: { path?: string; tag?: string; type?: 'page' | 'layout' };
+  let body: {
+    path?:    string;
+    tag?:     string;
+    type?:    'page' | 'layout';  // revalidatePath 두 번째 인자
+    expire?:  number;             // revalidateTag profile.expire (0 = 즉시 만료)
+  };
+
   try {
-    body = (await req.json()) as { path?: string; tag?: string; type?: 'page' | 'layout' };
+    body = (await req.json()) as typeof body;
   } catch {
     return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
   }
@@ -45,8 +60,16 @@ export async function POST(req: NextRequest) {
   }
 
   if (body.tag) {
-    // [TS Fix] revalidateTag은 단일 string 인자만 받음 (Next.js 16 canary 포함)
-    revalidateTag(body.tag);
+    /**
+     * [TS Fix] Next.js 16 canary revalidateTag 시그니쳐:
+     *   revalidateTag(tag: string, profile?: string | { expire?: number }): void
+     *
+     * 웹훅 컨텍스트(Route Handler)에서는 점진적 만료를 위해
+     * { expire: 0 } 패턴이 권장됨.
+     * body.expire가 입력되지 않으면 0을 기본값으로 사용.
+     */
+    const profile: TagProfile = { expire: body.expire ?? 0 };
+    revalidateTag(body.tag, profile);
     revalidated.push(`tag:${body.tag}`);
   }
 
