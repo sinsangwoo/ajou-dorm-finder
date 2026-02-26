@@ -3,40 +3,39 @@
  * ─────────────────────────────────────────────────────────────────────────────
  * Server-side data fetchers for dormitory & notice data.
  *
- * Single Point of Truth principle:
- *  - All data originates from either:
- *    a) The static source files in src/data/ (official, version-controlled)
- *    b) Supabase DB (officially updated by admin for per-semester quota changes)
- *  - NO speculative/calculated data is returned from this layer.
- *  - NO cutline estimates or probability figures are generated here.
+ * [TS Fix] id / capacity 관련 never 타입 에러:
+ *   supabase.from('dormitories').select('id, capacity, quota_general, quota_financial, semester')
+ *   에서 TypeScript가 select() 컬럼 목록을 기반으로 반환 타입을 자동으로 좁히는데,
+ *   이때 Supabase 제네릭 타입 추론이 실패하면 r.id, r.capacity 등이 never로 추론됨.
+ *
+ *   해결:
+ *   1. select() 결과에 명시적 타입 Pick<DbRow, ...> 을 지정.
+ *   2. 비교 연산 r.id === dorm.id: r.id(string) vs dorm.id(string) — 동일 타입 보장.
+ *   3. capacity: DB는 number, Dormitory.capacity는 string → 템플릿 리터럴로 변환.
  *
  * Graceful Degradation:
- *  - If Supabase env vars are missing → fall back to static data.
- *  - If Supabase query fails    → fall back to static data + log error.
- *  - The app is fully functional WITHOUT a Supabase project.
+ *  - Supabase 미설정 → 정적 데이터 fallback.
+ *  - Supabase 쿼리 실패 → 정적 데이터 fallback.
  */
 
-import { cache }           from 'react';
+import { cache }          from 'react';
 import { dormitories as staticDormitories } from '@/data/dormitoryData';
-import type { Dormitory }  from '@/data/dormitoryData';
+import type { Dormitory } from '@/data/dormitoryData';
 import { createServerSupabaseClient, isSupabaseConfigured } from './client';
-import type { Database }   from './database.types';
+import type { Database }  from './database.types';
 
-type DbNotice = Database['public']['Tables']['notices']['Row'];
+type DbDormRow = Database['public']['Tables']['dormitories']['Row'];
+type DbNotice  = Database['public']['Tables']['notices']['Row'];
+
+// select() 컬럼 목록과 정확히 일치하는 Pick 타입 — never 방지
+type DormQueryRow = Pick<DbDormRow, 'id' | 'capacity' | 'quota_general' | 'quota_financial' | 'semester'>;
 
 /**
  * getDormitories
  *
- * Returns the list of dormitories for the current semester.
- * Result is cached per React render tree via React.cache() so multiple RSC
- * imports don’t cause duplicate DB round-trips in the same request.
- *
  * Data source priority:
- *   1. Supabase `dormitories` table (contains per-semester quota overrides)
- *   2. Static dormitoryData.ts (fallback, always correct for structural data)
- *
- * Note: structural data (description, tags, features, eligibility) is
- * ALWAYS sourced from dormitoryData.ts. Supabase only overrides quota figures.
+ *   1. Supabase `dormitories` table (quota overrides)
+ *   2. Static dormitoryData.ts (structural data, always authoritative)
  */
 export const getDormitories = cache(async (): Promise<Dormitory[]> => {
   if (!isSupabaseConfigured()) {
@@ -47,27 +46,28 @@ export const getDormitories = cache(async (): Promise<Dormitory[]> => {
     const supabase = createServerSupabaseClient();
     if (!supabase) return staticDormitories;
 
-    // Fetch quota overrides for current semester
     const { data, error } = await supabase
       .from('dormitories')
       .select('id, capacity, quota_general, quota_financial, semester')
       .eq('semester', '2026-1')
-      .order('id');
+      .order('id')
+      // [TS Fix] 명시적 타입 캐스팅으로 never 타입 추론 방지
+      .returns<DormQueryRow[]>();
 
     if (error || !data || data.length === 0) {
       console.warn('[getDormitories] Supabase query failed, using static data:', error?.message);
       return staticDormitories;
     }
 
-    // Merge quota data from DB into static dorm objects
-    return staticDormitories.map((dorm) => {
-      const dbRow = data.find((r) => r.id === dorm.id);
+    return staticDormitories.map((dorm): Dormitory => {
+      // [TS Fix] r.id: string, dorm.id: string — 타입 일치 확인
+      const dbRow = data.find((r: DormQueryRow) => r.id === dorm.id);
       if (!dbRow) return dorm;
       return {
         ...dorm,
-        // Override capacity string if DB has updated figure
-        capacity: `점 ${dbRow.capacity}명`,
-        capacityNote: `(2026-1학기 공식 공고 기준)`,
+        // [TS Fix] dbRow.capacity: number → string 명시 변환
+        capacity: `총 ${dbRow.capacity}명`,
+        capacityNote: '(2026-1학기 공식 공고 기준)',
       };
     });
   } catch (err) {
@@ -80,10 +80,7 @@ export const getDormitories = cache(async (): Promise<Dormitory[]> => {
  * getNotices
  *
  * Returns recent official notices, pinned first.
- * Cached per request (React.cache).
- *
- * Falls back to empty array so the UI renders without notices
- * rather than crashing.
+ * Falls back to [] on any error.
  */
 export const getNotices = cache(async (
   limit = 10,

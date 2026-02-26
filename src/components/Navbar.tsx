@@ -2,25 +2,25 @@
 /**
  * Navbar.tsx — Client Component
  * ─────────────────────────────────────────────────────────────────────────────
- * Migrated from react-router-dom (useLocation / Link) to Next.js equivalents:
- *   - usePathname()  replaces useLocation().pathname
- *   - useRouter()    replaces useNavigate()
- *   - <Link href>    replaces <Link to>
+ * [TS Fix] pathname possibly null:
+ *   Next.js App Router에서 usePathname()의 반환 타입은 string | null.
+ *   pathname을 직접 비교 연산(=== '/', startsWith)에 사용하기 전
+ *   null guard (pathname ?? '') 를 적용.
  *
- * Theme toggle now uses next-themes (useTheme) instead of the custom
- * useTheme hook that read/wrote localStorage directly.
- *
- * Everything else (scroll-aware opacity, mobile drawer, active link
- * highlighting, hero-transparent mode) is preserved 1-for-1.
+ * 영향 받는 구문:
+ *   - `pathname === '/'`          → `(pathname ?? '') === '/'`
+ *   - `pathname.startsWith(href)` → `(pathname ?? '').startsWith(href)`
+ *   - `pathname !== '/'`          → `(pathname ?? '') !== '/'`
+ *   - isHero 조건의 `pathname === '/'` 포함
  */
 
 import { useEffect, useRef, useState } from 'react';
-import Link                            from 'next/link';
-import { usePathname }                 from 'next/navigation';
-import { useTheme }                   from 'next-themes';
+import Link           from 'next/link';
+import { usePathname } from 'next/navigation';
+import { useTheme }  from 'next-themes';
 import { Moon, Sun, ExternalLink, Menu, X } from 'lucide-react';
-import { cn }                          from '@/lib/utils';
-import { DORM_HOMEPAGE }              from '@/data/dormInfo';
+import { cn }         from '@/lib/utils';
+import { DORM_HOMEPAGE } from '@/data/dormInfo';
 
 const NAV_LINKS = [
   { href: '/',           label: '홈' },
@@ -29,7 +29,10 @@ const NAV_LINKS = [
 ];
 
 export function Navbar() {
-  const pathname               = usePathname();
+  // [TS Fix] usePathname() returns string | null in Next.js App Router
+  const rawPathname = usePathname();
+  const pathname    = rawPathname ?? '';   // null-coalesced to '' for all comparisons
+
   const { resolvedTheme, setTheme } = useTheme();
 
   const toggleTheme = () =>
@@ -51,7 +54,7 @@ export function Navbar() {
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
-  // Reset hero-mode when navigating away from home
+  // Reset hero-mode on navigation
   useEffect(() => {
     if (pathname !== '/') setIsOnHero(false);
     else setIsOnHero(window.scrollY < 60);
@@ -68,8 +71,8 @@ export function Navbar() {
       <nav
         className={cn(
           'navbar',
-          isHidden  && 'hidden-up',
-          isHero    && 'on-hero'
+          isHidden && 'hidden-up',
+          isHero   && 'on-hero',
         )}
       >
         <div className="container mx-auto px-4 h-full flex items-center justify-between">
@@ -79,7 +82,7 @@ export function Navbar() {
             href="/"
             className={cn(
               'font-extrabold text-base tracking-tight transition-colors duration-200',
-              isHero ? 'text-white' : 'text-foreground'
+              isHero ? 'text-white' : 'text-foreground',
             )}
           >
             아주대 긱사 어디가
@@ -88,7 +91,7 @@ export function Navbar() {
                 'ml-1.5 text-xs font-semibold px-1.5 py-0.5 rounded-md',
                 isHero
                   ? 'bg-white/20 text-white/80'
-                  : 'bg-primary/10 text-primary'
+                  : 'bg-primary/10 text-primary',
               )}
             >
               Beta
@@ -98,6 +101,7 @@ export function Navbar() {
           {/* Desktop nav links */}
           <div className="hidden md:flex items-center gap-1">
             {NAV_LINKS.map(({ href, label }) => {
+              // [TS Fix] pathname is guaranteed non-null string here
               const isActive =
                 href === '/' ? pathname === '/' : pathname.startsWith(href);
               return (
@@ -109,7 +113,7 @@ export function Navbar() {
                     isActive && 'active',
                     isHero
                       ? 'text-white/70 hover:text-white hover:bg-white/10'
-                      : 'hover:bg-muted'
+                      : 'hover:bg-muted',
                   )}
                 >
                   {label}
@@ -127,7 +131,7 @@ export function Navbar() {
                 'w-8 h-8 rounded-lg flex items-center justify-center transition-colors duration-200',
                 isHero
                   ? 'text-white/70 hover:text-white hover:bg-white/10'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-muted',
               )}
             >
               {resolvedTheme === 'dark'
@@ -145,7 +149,7 @@ export function Navbar() {
                 'px-3.5 py-2 rounded-lg transition-all duration-200',
                 isHero
                   ? 'bg-white/[0.12] text-white/80 hover:bg-white/[0.2] hover:text-white border border-white/20'
-                  : 'bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm hover:shadow-md'
+                  : 'bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm hover:shadow-md',
               )}
             >
               <ExternalLink className="w-3 h-3" />
@@ -159,7 +163,7 @@ export function Navbar() {
                 'md:hidden w-8 h-8 rounded-lg flex items-center justify-center transition-colors duration-200',
                 isHero
                   ? 'text-white/70 hover:text-white hover:bg-white/10'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-muted',
               )}
             >
               {mobileOpen ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
@@ -192,7 +196,7 @@ export function Navbar() {
                       'px-4 py-3 rounded-xl text-sm font-medium transition-colors',
                       isActive
                         ? 'bg-primary/[0.08] text-primary'
-                        : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                        : 'text-muted-foreground hover:text-foreground hover:bg-muted',
                     )}
                   >
                     {label}

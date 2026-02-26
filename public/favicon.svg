@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
+  <!--
+    Ajou University dormitory finder favicon.
+    SVG format: infinitely scalable, ~800 bytes (vs 15KB+ ICO).
+    Browser support: all modern browsers render SVG favicons.
+    Fallback: public/favicon.ico (existing) still used by old browsers.
+
+    Design: simplified building silhouette in Ajou Navy + Gold.
+      Primary Navy  #002855
+      Gold accent   #C5A028
+  -->
+
+  <!-- Background circle -->
+  <circle cx="16" cy="16" r="16" fill="#002855"/>
+
+  <!-- Building body -->
+  <rect x="8" y="13" width="16" height="13" rx="1" fill="#ffffff"/>
+
+  <!-- Roof / gable -->
+  <polygon points="6,13 16,5 26,13" fill="#C5A028"/>
+
+  <!-- Door -->
+  <rect x="13.5" y="20" width="5" height="6" rx="0.5" fill="#002855"/>
+
+  <!-- Windows -->
+  <rect x="9.5"  y="15" width="3.5" height="3" rx="0.3" fill="#002855" opacity="0.5"/>
+  <rect x="19"   y="15" width="3.5" height="3" rx="0.3" fill="#002855" opacity="0.5"/>
+</svg>
