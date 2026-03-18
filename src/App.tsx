@@ -1,23 +1,14 @@
 /**
  * src/App.tsx
- * ─────────────────────────────────────────────────────────────────────────────
- * Vite SPA 진입점 — Next.js 마이그레이션 완료 전까지 유지.
- *
- * [TS Fix] Navbar named import:
- *   Navbar.tsx 는 `export function Navbar()` (named export) 이므로
- *   `import { Navbar }` 로 가져와야 한다.
- *   이전: `import Navbar from '@/components/Navbar'`  ← default import (잘못됨)
- *   수정: `import { Navbar } from '@/components/Navbar'`
- *
- * NOTE: react-router-dom 기반 라우팅은 src/App.tsx / src/pages/ 전용.
- *       Next.js 빌드 대상(src/app/)에서는 절대 사용하지 않는다.
+ * Phase 1 업그레이드: MobileTabNav 추가
  */
 import { Toaster }                              from '@/components/ui/toaster';
 import { Toaster as Sonner }                    from '@/components/ui/sonner';
 import { TooltipProvider }                      from '@/components/ui/tooltip';
 import { QueryClient, QueryClientProvider }     from '@tanstack/react-query';
 import { BrowserRouter, Routes, Route }         from 'react-router-dom';
-import { Navbar }                               from '@/components/Navbar';   // named export
+import { Navbar }                               from '@/components/Navbar';
+import MobileTabNav                             from '@/components/MobileTabNav';
 import Index                                    from './pages/Index';
 import DormsPage                                from './pages/DormsPage';
 import DormDetailPage                           from './pages/DormDetailPage';
@@ -27,7 +18,6 @@ import { useTheme }                             from '@/hooks/useTheme';
 
 const queryClient = new QueryClient();
 
-// Inner wrapper — useLocation 사용을 위해 BrowserRouter 내부에 위치
 function AppShell() {
   useTheme();
   return (
@@ -40,6 +30,8 @@ function AppShell() {
         <Route path="/calculator" element={<CalculatorPage />} />
         <Route path="*"           element={<NotFound />} />
       </Routes>
+      {/* 모바일 전용 하단 탭 */}
+      <MobileTabNav />
     </>
   );
 }

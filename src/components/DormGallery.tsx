@@ -1,9 +1,8 @@
 /**
  * DormGallery.tsx — Phase 1: 기숙사 사진 갤러리
  *
- * - 아주대 생활관 공식 이미지 URL 적용 (https://dorm.ajou.ac.kr/...)
- * - 로컬 /public/images/dorms/{id}/ 에 추가 사진이 있으면 자동 로드
- * - 이미지 로드 실패 시 placeholder 표시
+ * 실제 이미지가 없는 상태에서도 동작하도록 placeholder 시스템을 구현.
+ * 실제 사진을 /public/images/dorms/{id}/ 에 넣으면 자동으로 표시됨.
  */
 
 import { useState } from "react";
@@ -16,53 +15,45 @@ export interface GalleryImage {
   caption?: string;
 }
 
-// 아주대 생활관 공식 이미지 URL
-export const DORM_GALLERY: Record<string, GalleryImage[]> = {
+// 각 기숙사별 갤러리 이미지 데이터
+// 실제 이미지 파일을 /public/images/dorms/{dormId}/*.jpg 에 추가하면 여기 경로만 업데이트하면 됩니다
+const DORM_GALLERY: Record<string, GalleryImage[]> = {
   namje: [
-    {
-      src: "https://dorm.ajou.ac.kr/_res/ajou/dorm/img/sketch/img-building-sketch01-01.png",
-      alt: "남제관 외관",
-      caption: "남제관 외관 스케치",
-    },
+    { src: "/images/dorms/namje/exterior.jpg", alt: "남제관 외관", caption: "남제관 외관" },
+    { src: "/images/dorms/namje/room.jpg", alt: "남제관 4인실", caption: "4인실 내부" },
+    { src: "/images/dorms/namje/corridor.jpg", alt: "남제관 복도", caption: "복도" },
   ],
   yongji: [
-    {
-      src: "https://dorm.ajou.ac.kr/_res/ajou/dorm/img/sketch/img-building-sketch02-04.png",
-      alt: "용지관 외관",
-      caption: "용지관 외관 스케치",
-    },
+    { src: "/images/dorms/yongji/exterior.jpg", alt: "용지관 외관", caption: "용지관 외관" },
+    { src: "/images/dorms/yongji/room.jpg", alt: "용지관 2인실", caption: "2인실 내부" },
+    { src: "/images/dorms/yongji/laundry.jpg", alt: "용지관 세탁실", caption: "공용 세탁실" },
   ],
   hwahong: [
-    {
-      src: "https://dorm.ajou.ac.kr/_res/ajou/dorm/img/sketch/img-building-sketch03-01.png",
-      alt: "화홍관 외관",
-      caption: "화홍관 외관 스케치",
-    },
+    { src: "/images/dorms/hwahong/exterior.jpg", alt: "화홍관 외관", caption: "화홍관 외관" },
+    { src: "/images/dorms/hwahong/room.jpg", alt: "화홍관 룸", caption: "객실 내부" },
+    { src: "/images/dorms/hwahong/kitchen.jpg", alt: "화홍관 공용 주방", caption: "공용 주방" },
   ],
   gwanggyo: [
-    {
-      src: "https://dorm.ajou.ac.kr/_res/ajou/dorm/img/sketch/img-building-sketch04-02.png",
-      alt: "광교관 외관",
-      caption: "광교관 외관 스케치",
-    },
+    { src: "/images/dorms/gwanggyo/exterior.jpg", alt: "광교관 외관", caption: "광교관 외관 (신축)" },
+    { src: "/images/dorms/gwanggyo/room.jpg", alt: "광교관 2인실", caption: "2인실 내부" },
+    { src: "/images/dorms/gwanggyo/lounge.jpg", alt: "광교관 라운지", caption: "공용 라운지" },
   ],
   international: [
-    {
-      src: "https://dorm.ajou.ac.kr/_res/ajou/dorm/img/sketch/img-building-sketch05-02.jpg",
-      alt: "국제학사 외관",
-      caption: "국제학사 외관 스케치",
-    },
+    { src: "/images/dorms/international/exterior.jpg", alt: "국제학사 외관", caption: "국제학사 외관" },
+    { src: "/images/dorms/international/room.jpg", alt: "국제학사 2인실", caption: "2인실 내부" },
+    { src: "/images/dorms/international/gym.jpg", alt: "국제학사 헬스장", caption: "헬스장" },
+    { src: "/images/dorms/international/kitchen.jpg", alt: "국제학사 공용 주방", caption: "공용 주방" },
   ],
   ilsin: [
-    {
-      src: "https://dorm.ajou.ac.kr/_res/ajou/dorm/img/sketch/img-building-sketch06-01.png",
-      alt: "일신관 외관",
-      caption: "일신관 외관 스케치",
-    },
+    { src: "/images/dorms/ilsin/exterior.jpg", alt: "일신관 외관", caption: "일신관 외관 (신축)" },
+    { src: "/images/dorms/ilsin/single.jpg", alt: "일신관 1인실", caption: "1인실 내부" },
+    { src: "/images/dorms/ilsin/double.jpg", alt: "일신관 2인실", caption: "2인실 내부" },
+    { src: "/images/dorms/ilsin/gym.jpg", alt: "일신관 헬스장", caption: "헬스장" },
+    { src: "/images/dorms/ilsin/kitchen.jpg", alt: "일신관 공용 주방", caption: "공용 주방" },
   ],
 };
 
-// placeholder 컴포넌트
+// 이미지 로드 실패 시 보여줄 Placeholder 컴포넌트
 function ImagePlaceholder({ index, caption }: { index: number; caption?: string }) {
   const gradients = [
     "from-blue-900 to-blue-700",
@@ -82,6 +73,8 @@ function ImagePlaceholder({ index, caption }: { index: number; caption?: string 
       <Camera className="w-10 h-10 text-white/30 mb-2" />
       <p className="text-white/40 text-xs text-center px-4">
         {caption || "사진 준비 중"}
+        <br />
+        <span className="text-[10px] opacity-60">이미지를 /public/images/dorms/ 에 추가해주세요</span>
       </p>
     </div>
   );
@@ -101,11 +94,14 @@ export default function DormGallery({ dormId }: DormGalleryProps) {
 
   const prev = () => setCurrent((c) => (c - 1 + images.length) % images.length);
   const next = () => setCurrent((c) => (c + 1) % images.length);
-  const handleImgError = (idx: number) =>
+
+  const handleImgError = (idx: number) => {
     setImgErrors((prev) => ({ ...prev, [idx]: true }));
+  };
 
   return (
     <>
+      {/* 메인 갤러리 */}
       <div className="glass-card-strong rounded-2xl p-6">
         <div className="flex items-center justify-between mb-4">
           <h2 className="font-bold text-lg tracking-tight">사진</h2>
@@ -125,18 +121,19 @@ export default function DormGallery({ dormId }: DormGalleryProps) {
             <img
               src={images[current].src}
               alt={images[current].alt}
-              className="w-full h-full object-contain bg-muted/20 transition-transform duration-300 group-hover:scale-105"
+              className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
               onError={() => handleImgError(current)}
-              crossOrigin="anonymous"
             />
           )}
 
+          {/* 확대 힌트 */}
           <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/20">
             <span className="text-white text-xs font-medium bg-black/40 px-3 py-1.5 rounded-full">
               클릭하여 확대
             </span>
           </div>
 
+          {/* 이전/다음 버튼 */}
           {images.length > 1 && (
             <>
               <button
@@ -156,6 +153,7 @@ export default function DormGallery({ dormId }: DormGalleryProps) {
             </>
           )}
 
+          {/* 캡션 */}
           {images[current].caption && (
             <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent px-4 py-3">
               <p className="text-white text-xs font-medium">{images[current].caption}</p>
@@ -163,7 +161,7 @@ export default function DormGallery({ dormId }: DormGalleryProps) {
           )}
         </div>
 
-        {/* 썸네일 */}
+        {/* 썸네일 스트립 */}
         {images.length > 1 && (
           <div className="flex gap-2 overflow-x-auto pb-1">
             {images.map((img, idx) => (
@@ -186,18 +184,12 @@ export default function DormGallery({ dormId }: DormGalleryProps) {
                     alt={img.alt}
                     className="w-full h-full object-cover"
                     onError={() => handleImgError(idx)}
-                    crossOrigin="anonymous"
                   />
                 )}
               </button>
             ))}
           </div>
         )}
-
-        {/* 코멘트: 공식 자료 이미지 */}
-        <p className="text-[10px] text-muted-foreground/40 mt-2 text-right">
-          이미지 출의: 아주대학교 생활관
-        </p>
       </div>
 
       {/* 라이트박스 */}
@@ -218,16 +210,15 @@ export default function DormGallery({ dormId }: DormGalleryProps) {
               <X className="w-6 h-6" />
             </button>
 
-            <div className="relative aspect-[4/3] rounded-2xl overflow-hidden bg-black">
+            <div className="relative aspect-[4/3] rounded-2xl overflow-hidden">
               {imgErrors[current] ? (
                 <ImagePlaceholder index={current} caption={images[current].caption} />
               ) : (
                 <img
                   src={images[current].src}
                   alt={images[current].alt}
-                  className="w-full h-full object-contain"
+                  className="w-full h-full object-contain bg-black"
                   onError={() => handleImgError(current)}
-                  crossOrigin="anonymous"
                 />
               )}
             </div>
