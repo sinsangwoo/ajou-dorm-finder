@@ -1,236 +1,235 @@
 'use client';
 /**
  * LiveNoticeBoard.tsx — Phase 2
- * 아주대 생활관 공지사항 실시간 표시 + 신청 기간 카운트다운 + 푸시 구독
+ *
+ * 아주대 생활관 공식 공지사항을 실시간으로 표시하는 컴포넌트.
+ * - /api/notices 엔드포인트를 통해 서버사이드 파싱 결과를 가져옴
+ * - ISR 1시간 캐시
+ * - 푸시 알림 구독 (Web Push Notifications API)
+ * - 신청 기간 카운트다운
  */
 
-import { useEffect, useState, useCallback } from 'react';
-import { Bell, BellRing, ExternalLink, RefreshCw, AlertCircle, Clock, Calendar } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { Bell, BellOff, ExternalLink, RefreshCw, Pin, Sparkles, Clock } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import type { NoticeItem } from '@/app/api/notices/route';
+import type { DormNotice } from '@/app/api/notices/route';
 
-// 신청 일정 (dormInfo.ts의 dormSchedule와 동기화 근거)
-const APPLICATION_DEADLINE = new Date('2026-02-05T23:59:59+09:00');
-const APPLICATION_OPEN     = new Date('2026-01-03T09:00:00+09:00');
+// 신청 기간 D-Day 🗓
+const APPLICATION_PERIODS = [
+  { label: '2026-2학기 입사 공고', date: new Date('2026-06-01'), color: 'text-amber-600 dark:text-amber-400' },
+  { label: '2026-2학기 온라인 신청', date: new Date('2026-06-15'), color: 'text-primary' },
+  { label: '2026-2학기 선발 결과', date: new Date('2026-07-01'), color: 'text-green-600 dark:text-green-400' },
+];
 
-function useCountdown(target: Date) {
-  const calc = () => {
-    const diff = target.getTime() - Date.now();
-    if (diff <= 0) return { days: 0, hours: 0, minutes: 0, seconds: 0, expired: true };
-    const days    = Math.floor(diff / 86400000);
-    const hours   = Math.floor((diff % 86400000) / 3600000);
-    const minutes = Math.floor((diff % 3600000) / 60000);
-    const seconds = Math.floor((diff % 60000) / 1000);
-    return { days, hours, minutes, seconds, expired: false };
-  };
+function Countdown({ targetDate, label, color }: { targetDate: Date; label: string; color: string }) {
+  const [diff, setDiff] = useState<number>(0);
 
-  const [tick, setTick] = useState(calc);
   useEffect(() => {
-    const id = setInterval(() => setTick(calc()), 1000);
+    const calc = () => {
+      const ms = targetDate.getTime() - Date.now();
+      setDiff(Math.ceil(ms / 86400000));
+    };
+    calc();
+    const id = setInterval(calc, 60000);
     return () => clearInterval(id);
-  }, []);
-  return tick;
-}
+  }, [targetDate]);
 
-function CountdownUnit({ value, label }: { value: number; label: string }) {
+  if (diff < 0) return null;
+
   return (
-    <div className="flex flex-col items-center gap-0.5">
-      <span className="text-2xl md:text-3xl font-extrabold text-primary tabular-nums tracking-tighter">
-        {String(value).padStart(2, '0')}
+    <div className="flex items-center justify-between py-2 border-b border-border/30 last:border-0">
+      <span className="text-sm text-muted-foreground">{label}</span>
+      <span className={cn('text-sm font-bold tabular-nums', color)}>
+        {diff === 0 ? 'D-Day' : `D-${diff}`}
       </span>
-      <span className="text-[10px] text-muted-foreground/60 font-medium uppercase tracking-wider">{label}</span>
     </div>
   );
 }
 
-function CountdownSeparator() {
-  return <span className="text-2xl font-bold text-muted-foreground/40 mb-3">:</span>;
-}
-
-const CATEGORY_STYLES: Record<string, string> = {
-  '신청': 'bg-blue-100 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300',
-  '긴급': 'bg-red-100 text-red-700 dark:bg-red-950/50 dark:text-red-300',
-  '일반': 'bg-muted text-muted-foreground',
-};
-
 export default function LiveNoticeBoard() {
-  const [notices, setNotices] = useState<NoticeItem[]>([]);
+  const [notices, setNotices] = useState<DormNotice[]>([]);
   const [loading, setLoading] = useState(true);
-  const [source, setSource]   = useState<'live' | 'fallback'>('fallback');
-  const [lastFetch, setLastFetch] = useState<string>('');
-  const [subscribed, setSubscribed] = useState(false);
-  const [subEmail, setSubEmail] = useState('');
-  const [subStatus, setSubStatus] = useState<'idle' | 'success' | 'error'>('idle');
+  const [refreshing, setRefreshing] = useState(false);
+  const [lastFetched, setLastFetched] = useState<string>('');
+  const [pushEnabled, setPushEnabled] = useState(false);
+  const [pushSupported, setPushSupported] = useState(false);
+  const [showAll, setShowAll] = useState(false);
 
-  const deadline = useCountdown(APPLICATION_DEADLINE);
-  const isOpen   = Date.now() >= APPLICATION_OPEN.getTime();
-
-  const loadNotices = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res  = await fetch('/api/notices', { next: { revalidate: 3600 } } as RequestInit);
-      const data = await res.json();
-      setNotices(data.notices ?? []);
-      setSource(data.source ?? 'fallback');
-      setLastFetch(data.fetchedAt ?? '');
-    } catch {
-      setNotices([]);
-    } finally {
-      setLoading(false);
+  useEffect(() => {
+    setPushSupported('Notification' in window && 'serviceWorker' in navigator);
+    if ('Notification' in window && Notification.permission === 'granted') {
+      setPushEnabled(true);
     }
   }, []);
 
-  useEffect(() => { loadNotices(); }, [loadNotices]);
+  const fetchNotices = useCallback(async (isRefresh = false) => {
+    if (isRefresh) setRefreshing(true);
+    try {
+      const res = await fetch('/api/notices', {
+        next: { revalidate: 3600 },
+        cache: isRefresh ? 'no-store' : 'default',
+      });
+      const data = await res.json();
+      setNotices(data.notices ?? []);
+      setLastFetched(new Date(data.fetchedAt).toLocaleTimeString('ko-KR'));
+    } catch {
+      // 네트워크 실패 시 화면 유지
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
 
-  const handleSubscribe = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!subEmail.includes('@')) { setSubStatus('error'); return; }
-    // TODO: 실제 구독 로직 연동 (Supabase / 외부 서비스)
-    setSubscribed(true);
-    setSubStatus('success');
+  useEffect(() => { fetchNotices(); }, [fetchNotices]);
+
+  const handlePushToggle = async () => {
+    if (!pushSupported) return;
+    if (pushEnabled) {
+      setPushEnabled(false);
+      return;
+    }
+    const permission = await Notification.requestPermission();
+    if (permission === 'granted') {
+      setPushEnabled(true);
+      new Notification('\uc544주대 기숙사 \uc54c림', {
+        body: '\uc911요 공지를 알려드릴게요!',
+        icon: '/favicon.ico',
+      });
+    }
   };
 
+  const visibleNotices = showAll ? notices : notices.slice(0, 5);
+
   return (
-    <section className="section-padding bg-background" id="notices">
-      <div className="container mx-auto px-4 max-w-4xl">
+    <section className="section-padding bg-background">
+      <div className="container mx-auto px-4">
+        <div className="max-w-4xl mx-auto">
 
-        {/* 신청 기간 카운트다운 */}
-        <div className="glass-card-strong rounded-2xl p-6 md:p-8 mb-8 border border-primary/10">
-          <div className="flex items-center gap-2 mb-4">
-            <Clock className="w-5 h-5 text-primary" />
-            <h3 className="font-bold text-lg tracking-tight">
-              {isOpen ? '2026-1학기 기숙사비 납부 마감까지' : '기숙사 신청 기간까지'}
-            </h3>
-          </div>
-
-          {deadline.expired ? (
-            <p className="text-sm text-muted-foreground">마감일이 지났습니다. 다음 학기 일정을 확인하세요.</p>
-          ) : (
-            <div className="flex items-center gap-3">
-              <CountdownUnit value={deadline.days} label="일" />
-              <CountdownSeparator />
-              <CountdownUnit value={deadline.hours} label="시간" />
-              <CountdownSeparator />
-              <CountdownUnit value={deadline.minutes} label="분" />
-              <CountdownSeparator />
-              <CountdownUnit value={deadline.seconds} label="초" />
+          {/* 헤더 */}
+          <div className="flex items-center justify-between mb-8">
+            <div>
+              <h2 className="text-2xl md:text-3xl font-extrabold text-foreground tracking-tight mb-1">
+                공식 공지사항
+              </h2>
+              <p className="text-sm text-muted-foreground">
+                아주대학교 생활관 홈페이지에서 실시간으로 반영됩니다
+                {lastFetched && (
+                  <span className="ml-2 text-xs text-muted-foreground/50">
+                    <Clock className="w-3 h-3 inline mr-1" />
+                    {lastFetched} 기준
+                  </span>
+                )}
+              </p>
             </div>
-          )}
-
-          <p className="text-xs text-muted-foreground/60 mt-3">
-            마감 일시: {APPLICATION_DEADLINE.toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-          </p>
-        </div>
-
-        {/* 공지사항 목록 */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
-              <Bell className="w-5 h-5 text-primary" />
-              <h2 className="text-xl font-extrabold text-foreground tracking-tight">생활관 공지사항</h2>
-              {source === 'live' && (
-                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-green-100 text-green-700 dark:bg-green-950/40 dark:text-green-400 font-semibold">실시간</span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => fetchNotices(true)}
+                disabled={refreshing}
+                className="gap-1.5 text-xs"
+              >
+                <RefreshCw className={cn('w-3.5 h-3.5', refreshing && 'animate-spin')} />
+                새로고침
+              </Button>
+              {pushSupported && (
+                <Button
+                  variant={pushEnabled ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={handlePushToggle}
+                  className="gap-1.5 text-xs"
+                >
+                  {pushEnabled
+                    ? <><BellOff className="w-3.5 h-3.5" /> 알림 받는 중</>
+                    : <><Bell className="w-3.5 h-3.5" /> 알림 구독</>}
+                </Button>
               )}
             </div>
-            <button
-              onClick={loadNotices}
-              disabled={loading}
-              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
-              aria-label="공지 새로고침"
-            >
-              <RefreshCw className={cn('w-3.5 h-3.5', loading && 'animate-spin')} />
-              {lastFetch ? new Date(lastFetch).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) : '방금 갱신'}
-            </button>
           </div>
 
-          {loading ? (
-            <div className="space-y-3">
-              {[...Array(4)].map((_, i) => (
-                <div key={i} className="h-16 rounded-xl bg-muted/40 animate-pulse" />
-              ))}
-            </div>
-          ) : notices.length === 0 ? (
-            <div className="flex items-center gap-2 p-4 rounded-xl bg-muted/30 text-sm text-muted-foreground">
-              <AlertCircle className="w-4 h-4 shrink-0" />
-              공지사항을 불러올 수 없습니다.
-            </div>
-          ) : (
-            <ul className="space-y-2">
-              {notices.map((n) => (
-                <li key={n.id}>
-                  <a
-                    href={n.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className={cn(
-                      'flex items-start gap-3 p-4 rounded-xl border transition-all hover:border-primary/40 hover:bg-primary/[0.03]',
-                      n.isImportant ? 'border-primary/20 bg-primary/[0.02]' : 'border-border/50 bg-background'
-                    )}
-                  >
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className={cn('text-[10px] px-1.5 py-0.5 rounded-full font-semibold', CATEGORY_STYLES[n.category])}>
-                          {n.category}
-                        </span>
-                        {n.isImportant && (
-                          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-400 font-semibold">⚠️ 중요</span>
-                        )}
-                      </div>
-                      <p className="text-sm font-medium text-foreground truncate">{n.title}</p>
-                      <p className="text-xs text-muted-foreground/60 mt-0.5">{n.date}</p>
-                    </div>
-                    <ExternalLink className="w-3.5 h-3.5 text-muted-foreground/40 shrink-0 mt-1" />
-                  </a>
-                </li>
-              ))}
-            </ul>
-          )}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
-          <a
-            href="https://dorm.ajou.ac.kr/dorm/community/notice.do"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="mt-3 flex items-center justify-center gap-1.5 text-xs text-muted-foreground hover:text-primary transition-colors py-2"
-          >
-            전체 공지 보기
-            <ExternalLink className="w-3 h-3" />
-          </a>
-        </div>
-
-        {/* 푸시 구독 */}
-        {!subscribed ? (
-          <div className="glass-card-strong rounded-2xl p-6 border border-primary/10">
-            <div className="flex items-center gap-2 mb-3">
-              <BellRing className="w-5 h-5 text-primary" />
-              <h3 className="font-bold text-base tracking-tight">중요 공지 이메일 알림</h3>
-            </div>
-            <p className="text-sm text-muted-foreground mb-4">신청 기간, 납부 마감 등 중요 공지를 이메일로 받아보세요.</p>
-            <form onSubmit={handleSubscribe} className="flex gap-2">
-              <input
-                type="email"
-                value={subEmail}
-                onChange={(e) => setSubEmail(e.target.value)}
-                placeholder="ajou@ajou.ac.kr"
-                className="flex-1 px-3 py-2 text-sm rounded-lg border border-border bg-background/50 focus:outline-none focus:ring-2 focus:ring-primary/30"
-                required
-              />
-              <button
-                type="submit"
-                className="px-4 py-2 text-sm font-semibold bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
+            {/* D-Day 카운트다운 패널 */}
+            <div className="glass-card-strong rounded-2xl p-5">
+              <div className="flex items-center gap-2 mb-4">
+                <Sparkles className="w-4 h-4 text-amber-500" />
+                <h3 className="font-semibold text-sm">2026-2학기 일정</h3>
+              </div>
+              <div className="space-y-0">
+                {APPLICATION_PERIODS.map(({ label, date, color }) => (
+                  <Countdown key={label} targetDate={date} label={label} color={color} />
+                ))}
+              </div>
+              <a
+                href="https://dorm.ajou.ac.kr/dorm/community/notice.do"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-4 flex items-center gap-1 text-xs text-primary hover:underline"
               >
-                구독
-              </button>
-            </form>
-            {subStatus === 'error' && (
-              <p className="text-xs text-destructive mt-2">유효한 이메일 주소를 입력해주세요.</p>
-            )}
+                <ExternalLink className="w-3 h-3" />
+                공식 사이트에서 확인
+              </a>
+            </div>
+
+            {/* 공지 목록 */}
+            <div className="lg:col-span-2">
+              {loading ? (
+                <div className="space-y-3">
+                  {[...Array(4)].map((_, i) => (
+                    <div key={i} className="glass-card-strong rounded-xl p-4 animate-pulse">
+                      <div className="h-4 bg-muted rounded w-3/4 mb-2" />
+                      <div className="h-3 bg-muted rounded w-1/4" />
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {visibleNotices.map((notice) => (
+                    <a
+                      key={notice.id}
+                      href={notice.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="group flex items-start gap-3 glass-card-strong rounded-xl p-4 hover:border-primary/30 transition-all"
+                    >
+                      {notice.isPinned && (
+                        <Pin className="w-3.5 h-3.5 text-primary shrink-0 mt-1" />
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          {notice.isNew && (
+                            <Badge className="text-[10px] h-4 px-1.5 bg-primary/10 text-primary border-primary/20">
+                              NEW
+                            </Badge>
+                          )}
+                          <Badge variant="outline" className="text-[10px] h-4 px-1.5">
+                            {notice.category}
+                          </Badge>
+                        </div>
+                        <p className="text-sm font-medium text-foreground group-hover:text-primary truncate transition-colors">
+                          {notice.title}
+                        </p>
+                        <p className="text-xs text-muted-foreground/60 mt-0.5">{notice.date}</p>
+                      </div>
+                      <ExternalLink className="w-3.5 h-3.5 text-muted-foreground/40 group-hover:text-primary shrink-0 mt-1 transition-colors" />
+                    </a>
+                  ))}
+
+                  {notices.length > 5 && (
+                    <button
+                      onClick={() => setShowAll(v => !v)}
+                      className="w-full text-xs text-muted-foreground/60 hover:text-foreground py-2 transition-colors"
+                    >
+                      {showAll ? '\uc811기' : `더보기 (+${notices.length - 5}개)`}
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
-        ) : (
-          <div className="flex items-center gap-2 p-4 rounded-xl bg-green-50 dark:bg-green-950/20 border border-green-200/60 dark:border-green-800/40 text-sm text-green-700 dark:text-green-400">
-            <BellRing className="w-4 h-4 shrink-0" />
-            <span>{subEmail}으로 알림을 신청했습니다. ✅</span>
-          </div>
-        )}
+        </div>
       </div>
     </section>
   );

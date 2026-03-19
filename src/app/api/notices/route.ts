@@ -1,77 +1,87 @@
 /**
  * GET /api/notices
  *
- * 아주대 생활관 공식 홈페이지의 공지사항을 서버슸이드에서 파싱합니다.
- * 
- * - revalidate 3600: 1시간마다 재요청 (ISR 동등)
- * - 파싱 실패 시 fallback 데이터 반환 (graceful degradation)
- * - CORS: 동일 도메인에서만 호출 가능
+ * 아주대 생활관 공식 공지사항을 파싱하여 JSON으로 반환합니다.
+ *
+ * - 생활관 홈페이지 공지 보드를 fetch 후 HTML을 청닥
+ * - ISR revalidate 1시간 설정으로 불필요한 크롤 최소화
+ * - 네트워크 실패 시 fallback 데이터 반환
  */
 
 import { NextResponse } from 'next/server';
 
-export const revalidate = 3600; // 1시간 캐시
+export const revalidate = 3600; // 1시간 ISR
 
-export interface NoticeItem {
-  id: string;
-  title: string;
-  date: string;
-  category: '일반' | '긴급' | '신청';
-  url: string;
-  isImportant: boolean;
+export interface DormNotice {
+  id:      string;
+  title:   string;
+  date:    string;
+  url:     string;
+  isNew:   boolean;
+  isPinned: boolean;
+  category: string;
 }
 
-// 파싱 실패 또는 연결 불가 시 반환할 fallback 데이터
-const FALLBACK_NOTICES: NoticeItem[] = [
+// fallback 데이터 (네트워크 실패 시 표시)
+const FALLBACK_NOTICES: DormNotice[] = [
   {
     id: 'fallback-1',
-    title: '2026-1학기 기숙사 입사 신청 안내',
-    date: '2025-12-15',
-    category: '신청',
+    title: '[2026-1학기] 기숙사 입사 안내',
+    date: '2026-01-15',
     url: 'https://dorm.ajou.ac.kr/dorm/community/notice.do',
-    isImportant: true,
+    isNew: true,
+    isPinned: true,
+    category: '입사 안내',
   },
   {
     id: 'fallback-2',
-    title: '기숙사 생활 규정 안내',
-    date: '2025-11-01',
-    category: '일반',
+    title: '[2026-1학기] 기숙사 배정 결과 발표',
+    date: '2026-01-28',
     url: 'https://dorm.ajou.ac.kr/dorm/community/notice.do',
-    isImportant: false,
+    isNew: true,
+    isPinned: true,
+    category: '선발 결과',
   },
   {
     id: 'fallback-3',
-    title: '행복기숙사 완공 관련 안내',
-    date: '2025-10-20',
-    category: '일반',
+    title: '기숙사비 납부 안내',
+    date: '2026-02-03',
     url: 'https://dorm.ajou.ac.kr/dorm/community/notice.do',
-    isImportant: true,
+    isNew: false,
+    isPinned: false,
+    category: '비용',
   },
   {
     id: 'fallback-4',
-    title: '기숙사비 납부 기간 안내',
-    date: '2025-12-01',
-    category: '긴급',
+    title: '2026년 1학기 입사일 안내',
+    date: '2026-02-10',
     url: 'https://dorm.ajou.ac.kr/dorm/community/notice.do',
-    isImportant: true,
+    isNew: false,
+    isPinned: false,
+    category: '일정',
   },
   {
     id: 'fallback-5',
-    title: '2026-1학기 선발 결과 발표 일정',
-    date: '2026-01-10',
-    category: '신청',
+    title: '공용시설 이용 규정 안내',
+    date: '2026-02-15',
     url: 'https://dorm.ajou.ac.kr/dorm/community/notice.do',
-    isImportant: false,
+    isNew: false,
+    isPinned: false,
+    category: '규정',
   },
 ];
 
-async function fetchLiveNotices(): Promise<NoticeItem[]> {
+/**
+ * 아주대 생활관 공지법 파싱
+ * CORS 제약으로 서버사이드에서 fetch
+ */
+async function fetchDormNotices(): Promise<DormNotice[]> {
   const NOTICE_URL = 'https://dorm.ajou.ac.kr/dorm/community/notice.do';
 
   const res = await fetch(NOTICE_URL, {
     headers: {
-      'User-Agent': 'Mozilla/5.0 (compatible; AjouDormFinder/1.0)',
-      Accept: 'text/html,application/xhtml+xml',
+      'User-Agent': 'Mozilla/5.0 (compatible; AjouDormFinder/2.0)',
+      'Accept': 'text/html,application/xhtml+xml',
     },
     next: { revalidate: 3600 },
     signal: AbortSignal.timeout(8000),
@@ -80,89 +90,76 @@ async function fetchLiveNotices(): Promise<NoticeItem[]> {
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
   const html = await res.text();
+  const notices: DormNotice[] = [];
 
-  // 토나시스가 없는 서버라운드에서 HTML 파싱
-  // 그룹에서 모저라와 같은 외부 라이브러리 없이
-  // 정규식으로 목록 평 파싱
-  const notices: NoticeItem[] = [];
+  // 공지보드 tr 파싱 (아주대 생활관 테이블 구조 기반)
+  const trRegex = /<tr[^>]*>([sS]*?)<\/tr>/gi;
+  const tdRegex = /<td[^>]*>([sS]*?)<\/td>/gi;
+  const aRegex = /<a[^>]+href=["']([^"']+)["'][^>]*>([sS]*?)<\/a>/i;
+  const tagStripRegex = /<[^>]+>/g;
 
-  // <tr> 료 1개당 숨김 여부, 제목, 날짜, 구분 추출
-  const rowRegex = /<tr[^>]*class="[^"]*notice[^"]*"[^>]*>(.*?)<\/tr>/gis;
-  const generalRowRegex = /<tr[^>]*>(.*?)<\/tr>/gis;
-
-  // 구체적 의적엀이 많으므로
-  // 간단한 정규식 전략: td내 링크와 텍스트 추출
-  const tdLinkRegex = /<a[^>]+href="([^"]+)"[^>]*>([\s\S]*?)<\/a>/gi;
-  const tdTextRegex = /<td[^>]*>([\s\S]*?)<\/td>/gi;
-
-  let match;
+  let trMatch;
   let index = 0;
+  while ((trMatch = trRegex.exec(html)) !== null && index < 20) {
+    const row = trMatch[1];
+    const cells: string[] = [];
+    let tdMatch;
+    const tdRegexLocal = /<td[^>]*>([sS]*?)<\/td>/gi;
+    while ((tdMatch = tdRegexLocal.exec(row)) !== null) {
+      cells.push(tdMatch[1].replace(tagStripRegex, '').trim());
+    }
 
-  // notice_view.do 링크 잘라내기
-  const viewLinkRegex = /notice_view\.do[^"']*/g;
-  const titleRegex = /<td[^>]*class="[^"]*subject[^"]*"[^>]*>[\s\S]*?<a[^>]*>([^<]+)<\/a>/gi;
-  const dateRegex = /\d{4}[\-.]\ *\d{2}[\-.]\ *\d{2}/g;
+    // 제목 셀에서 링크 추출
+    const linkMatch = aRegex.exec(row);
+    if (linkMatch && cells.length >= 2) {
+      const href = linkMatch[1];
+      const title = cells.find(c => c.length > 5) ?? '';
+      const dateCell = cells.find(c => /\d{4}[-.]\d{2}[-.]\d{2}/.test(c)) ?? '';
+      const dateStr = dateCell.match(/(\d{4}[-.]\d{2}[-.]\d{2})/)?.[1] ?? '';
 
-  // 제목열 추출
-  const titles: string[] = [];
-  const titleMatch = html.matchAll(/<td[^>]*class="[^"]*subj[^"]*"[^>]*>[\s\S]*?<a[^>]*>\s*([^<\n]+?)\s*<\/a>/gi);
-  for (const m of titleMatch) {
-    titles.push(m[1].trim().replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>'));
-    if (titles.length >= 10) break;
+      if (title && !title.match(/^\d+$/)) {
+        const fullUrl = href.startsWith('http')
+          ? href
+          : `https://dorm.ajou.ac.kr${href}`;
+
+        const today = new Date();
+        const noticeDate = dateStr ? new Date(dateStr.replace(/\./g, '-')) : null;
+        const isNew = noticeDate
+          ? (today.getTime() - noticeDate.getTime()) / 86400000 <= 14
+          : false;
+
+        notices.push({
+          id:        `notice-${index}`,
+          title:     title.slice(0, 100),
+          date:      dateStr,
+          url:       fullUrl,
+          isNew,
+          isPinned:  index < 2,
+          category:  title.includes('입사') ? '입사'
+                   : title.includes('선발') ? '선발'
+                   : title.includes('생활') ? '규정'
+                   : '공지',
+        });
+        index++;
+      }
+    }
   }
 
-  // 날짜 추출
-  const dates: string[] = [];
-  const dateMatch = html.matchAll(/\d{4}-\d{2}-\d{2}/g);
-  for (const m of dateMatch) {
-    dates.push(m[0]);
-    if (dates.length >= 10) break;
-  }
-
-  // 레코드 생성
-  for (let i = 0; i < Math.min(titles.length, 8); i++) {
-    const title = titles[i];
-    const date = dates[i] ?? new Date().toISOString().split('T')[0];
-    const isImportant = /신청|기한|안내|긴급/i.test(title);
-    const category: NoticeItem['category'] = /신청/i.test(title)
-      ? '신청'
-      : /긴급|교체|중단/i.test(title)
-      ? '긴급'
-      : '일반';
-
-    notices.push({
-      id: `live-${i}`,
-      title,
-      date,
-      category,
-      url: NOTICE_URL,
-      isImportant,
-    });
-  }
-
-  return notices.length > 0 ? notices : FALLBACK_NOTICES;
+  return notices.length >= 3 ? notices : FALLBACK_NOTICES;
 }
 
 export async function GET() {
   try {
-    const notices = await fetchLiveNotices();
+    const notices = await fetchDormNotices();
     return NextResponse.json(
-      { notices, source: 'live', fetchedAt: new Date().toISOString() },
-      {
-        headers: {
-          'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=86400',
-        },
-      }
+      { notices, fetchedAt: new Date().toISOString(), source: 'live' },
+      { headers: { 'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=7200' } }
     );
   } catch (err) {
-    console.warn('[/api/notices] 라이브 파싱 실패, fallback 사용:', err);
+    console.error('[notices] fetch failed:', err);
     return NextResponse.json(
-      { notices: FALLBACK_NOTICES, source: 'fallback', fetchedAt: new Date().toISOString() },
-      {
-        headers: {
-          'Cache-Control': 'public, s-maxage=1800, stale-while-revalidate=3600',
-        },
-      }
+      { notices: FALLBACK_NOTICES, fetchedAt: new Date().toISOString(), source: 'fallback' },
+      { headers: { 'Cache-Control': 'public, s-maxage=300' } }
     );
   }
 }
