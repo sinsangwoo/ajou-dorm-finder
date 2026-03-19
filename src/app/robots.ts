@@ -1,46 +1,37 @@
 /**
- * src/app/robots.ts  —  Next.js 15 Robots (RSC)
- * ─────────────────────────────────────────────────────────────────────────────
- * Generates /robots.txt at build time.
+ * src/app/robots.ts  —  Next.js Robots (RSC)
  *
- * Policy:
- *  - Allow all major search bots to crawl all public pages.
- *  - Explicitly disallow the API routes (security boundary).
- *  - Point to sitemap for full URL discovery.
+ * 테스트 요구사항:
+ *  - Allow: /
+ *  - Disallow: /api/
+ *  - Sitemap: 포함
  */
 
 import type { MetadataRoute } from 'next';
-import { tenant } from '@/config';
+
+const BASE_URL =
+  process.env.NEXT_PUBLIC_SITE_URL ?? 'https://ajou-dorm-finder.vercel.app';
 
 export default function robots(): MetadataRoute.Robots {
-  const base = tenant.seo.siteUrl;
-
   return {
     rules: [
       {
         userAgent: '*',
-        allow: ['/'],
-        disallow: [
-          '/api/',        // Internal API routes (revalidation, etc.)
-          '/_next/',      // Next.js internals (already blocked by default, explicit for safety)
-        ],
+        allow:    ['/'],
+        disallow: ['/api/', '/_next/'],
       },
-      // Let Googlebot + Bingbot crawl aggressively (Korean students use both)
       {
-        userAgent: ['Googlebot', 'Bingbot'],
-        allow: ['/'],
+        userAgent: ['Googlebot', 'Bingbot', 'Twitterbot', 'facebookexternalhit'],
+        allow:    ['/'],
         disallow: ['/api/'],
-        crawlDelay: 1,
       },
-      // Naver search bot (dominant in Korea)
       {
         userAgent: 'Yeti',
-        allow: ['/'],
+        allow:    ['/'],
         disallow: ['/api/'],
-        crawlDelay: 1,
       },
     ],
-    sitemap: `${base}/sitemap.xml`,
-    host:    base,
+    sitemap: `${BASE_URL}/sitemap.xml`,
+    host:    BASE_URL,
   };
 }
