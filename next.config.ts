@@ -3,13 +3,24 @@ import type { NextConfig } from 'next';
 /**
  * next.config.ts
  *
- * - output: 'standalone' 제거: Docker 배포용이며 Vercel에서는 불필요.
- *   standalone이 있으면 `npm start`(next start)가 동작하지 않아 CI E2E 서버가 실패함.
+ * 주요 설계 결정:
  *
- * - turbopack: {}: Next.js 16 기본 빌더. 명시적으로 opt-in하여 에러 억제.
+ * 1. output: 'standalone' 제거
+ *    Docker 배포용이며 Vercel에서는 불필요.
+ *    standalone이 있으면 `npm start`(next start)가 동작하지 않아
+ *    CI E2E 서버가 실패함.
  *
- * - pageExtensions: src/pages/의 Vite SPA 컴포넌트가
- *   Next.js Pages Router로 스캔되어 SSR crash하는 것을 방지.
+ * 2. turbopack: {}
+ *    Next.js 16 기본 빌더. 명시적 opt-in으로 빌드 에러 억제.
+ *
+ * 3. pageExtensions 제거 (중요!)
+ *    pageExtensions을 커스터마이징하면 sitemap.ts, robots.ts 같은
+ *    Next.js App Router 특수 파일도 동시에 필터마어다.
+ *    이로 인해 /sitemap.xml, /robots.txt가 404를 반환함.
+ *
+ *    src/pages/ 폴더의 Vite SPA 컴포넌트들은 이미 `export {}`로
+ *    비워졌으므로 default export가 없어 Pages Router에 등록되지 않음.
+ *    pageExtensions 없이도 안전함.
  */
 
 const SITE_URL =
@@ -45,10 +56,10 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
-  // output: 'standalone' 제거 — npm start / Vercel 먹실 쭔인이 실패하는 원인
   reactStrictMode: true,
   turbopack: {},
-  pageExtensions: ['page.tsx', 'page.ts', 'page.jsx', 'page.js'],
+  // pageExtensions 제거: sitemap.ts / robots.ts / layout.tsx 등
+  // App Router 특수 파일이 필터마어지는 부작용 제거
 
   async headers() {
     return [{ source: '/(.*)', headers: securityHeaders }];
