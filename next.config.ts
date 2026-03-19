@@ -3,16 +3,21 @@ import type { NextConfig } from 'next';
 /**
  * next.config.ts
  *
- * - output: 'standalone' 제거:
- *   Vercel 배포에서는 standalone이 불필요하고
- *   CI E2E에서 `npm start`(next start)를 사용하려면 standalone이 없어야 합니다.
- *   standalone은 Docker 배포용으로만 사용합니다.
+ * Key decisions for Next.js 16 + Vite SPA coexistence:
  *
- * - turbopack: {} 요시: Next.js 16 Turbopack 기본값 설정에서
- *   webpack config가 있으면 빌드 에러를 내는데, turbopack: {}로 억제.
+ * 1. turbopack: {}  — required because webpack() was removed.
+ *    Next.js 16 Turbopack is the default builder; an empty turbopack
+ *    config opts in explicitly and silences the hard build error.
  *
- * - pageExtensions: src/pages/가 Next.js Pages Router로
- *   스캔되어 react-router-dom 컴포넌트가 SSR되는 것을 저지.
+ * 2. pageExtensions: ['page.tsx', ...]  — critical for SPA coexistence.
+ *    This project has BOTH src/app/ (Next.js App Router) AND
+ *    src/pages/ (Vite SPA components that use react-router-dom).
+ *    Without this, Next.js Pages Router scans src/pages/ and tries to
+ *    SSR every .tsx file, crashing on react-router-dom hooks that
+ *    require RouterContext (which doesn't exist in SSR).
+ *    By restricting pageExtensions to *.page.tsx, no file in
+ *    src/pages/ matches (none are named *.page.tsx), so Pages Router
+ *    is effectively disabled without deleting the folder.
  */
 
 const SITE_URL =
@@ -51,10 +56,13 @@ const nextConfig: NextConfig = {
   // output: 'standalone' 제거 — npm start / Vercel 먹실 쭔인이 실패하는 원인
   reactStrictMode: true,
 
+  // Turbopack: required for Next.js 16 (default builder).
   turbopack: {},
 
-  // src/pages/ 폴더를 Pages Router가 스캔하지 못하게 함
-  // (파일 이름이 *.page.tsx인 파일이 없으므로 실질적으로 Pages Router 비활성화)
+  // Pages Router 비활성화:
+  // src/pages/ 폴더는 Vite SPA(react-router-dom) 전용 컴포넌트를 담는다.
+  // *.page.tsx 확장자를 소유한 파일이 없으므로
+  // Next.js Pages Router는 어떤 파일도 라우트로 등록하지 않는다.
   pageExtensions: ['page.tsx', 'page.ts', 'page.jsx', 'page.js'],
 
   async headers() {
