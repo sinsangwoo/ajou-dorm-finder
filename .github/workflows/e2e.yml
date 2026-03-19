@@ -46,8 +46,6 @@ jobs:
           fi
 
   # ── Job 2: TypeScript check ────────────────────────────────────────────────
-  # 빌드보다 먼저 실행: .next/ 폴더가 없는 상태에서 src 소스만 검사합니다.
-  # tsconfig.json의 exclude에 .next가 있으므로 dev 타입 잔재물에 영향받지 않습니다.
   typecheck:
     name: TypeScript Check
     runs-on: ubuntu-latest
@@ -67,11 +65,11 @@ jobs:
       - name: Type check
         run: npx tsc --noEmit
 
-  # ── Job 3: E2E test suite ──────────────────────────────────────────────────
+  # ── Job 3: E2E test suite ────────────────────────────────────────────────
   e2e:
     name: Playwright E2E
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 30
     needs: typecheck
     steps:
       - uses: actions/checkout@v4
@@ -96,6 +94,40 @@ jobs:
           NEXT_PUBLIC_TENANT_ID: ajou
           NEXT_PUBLIC_SITE_URL:  http://localhost:3000
 
+      # ① 빌드된 앱을 백그라운드에서 실행
+      # output: 'standalone' 빌드에서는 .next/standalone/server.js 를 직접 실행합니다.
+      # 일반 `next start` 는 node_modules가 필요하지만
+      # standalone 모드는 독립적으로 실행되므로 을 사용합니다.
+      - name: Start server (background)
+        run: |
+          # standalone 빌드를 public 설정과 함께 시작
+          # (public/ 폴더는 standalone에 포함되지 않으므로 링크 필요)
+          cp -r public .next/standalone/public 2>/dev/null || true
+          cp -r .next/static .next/standalone/.next/static 2>/dev/null || true
+          PORT=3000 node .next/standalone/server.js &
+          echo "SERVER_PID=$!" >> $GITHUB_ENV
+        env:
+          PORT: 3000
+          HOSTNAME: 0.0.0.0
+          NEXT_PUBLIC_TENANT_ID: ajou
+          NEXT_PUBLIC_SITE_URL:  http://localhost:3000
+
+      # ② 서버가 실제로 응답할 때까지 대기
+      # 최대 60초 동안 2초 간격으로 HTTP 200을 확인
+      - name: Wait for server
+        run: |
+          echo "🔄 서버 응답 대기 중 (http://localhost:3000)..."
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:3000 > /dev/null 2>&1; then
+              echo "✅ 서버 준비 완료 ($((i*2))초 소요)"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "❌ 60초 후에도 서버가 응답하지 않습니다"
+          exit 1
+
+      # ③ E2E 테스트 실행
       - name: E2E tests
         run: npx playwright test --project=chromium
         env:
