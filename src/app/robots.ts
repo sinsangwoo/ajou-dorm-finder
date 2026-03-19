@@ -1,10 +1,8 @@
 /**
- * src/app/robots.ts  —  Next.js Robots (RSC)
+ * src/app/robots.ts — Next.js Robots
  *
- * 테스트 요구사항:
- *  - Allow: /
- *  - Disallow: /api/
- *  - Sitemap: 포함
+ * tenant import 제거: 직접 환경변수 사용.
+ * 테스트 요구사항: Allow: /, Disallow: /api/, Sitemap: 포함
  */
 
 import type { MetadataRoute } from 'next';
