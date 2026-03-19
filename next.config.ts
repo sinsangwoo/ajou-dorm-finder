@@ -45,7 +45,7 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
-  // output: 'standalone' 제거 — npm start / Vercel 동작 보질
+  // output: 'standalone' 제거 — npm start / Vercel 먹실 쭔인이 실패하는 원인
   reactStrictMode: true,
   turbopack: {},
   pageExtensions: ['page.tsx', 'page.ts', 'page.jsx', 'page.js'],

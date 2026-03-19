@@ -83,8 +83,8 @@ jobs:
           NEXT_PUBLIC_TENANT_ID: ajou
           NEXT_PUBLIC_SITE_URL:  http://localhost:3000
 
-      # ① npm start 로 프로덕션 서버 백그라운드 실행
-      # output: 'standalone'을 제거했으므로 npm start(next start)가 정상 동작함
+      # ① npm start (next start) 로 프로덕션 서버 백그라운드 실행
+      # output: 'standalone'을 제거함으로써 일반 next start 사용 가능
       - name: Start server (background)
         run: |
           nohup npm start -- -p 3000 -H 0.0.0.0 > /tmp/next-server.log 2>&1 &
@@ -93,8 +93,8 @@ jobs:
           NEXT_PUBLIC_TENANT_ID: ajou
           NEXT_PUBLIC_SITE_URL:  http://localhost:3000
 
-      # ② TCP 연결이 되면 통과 (상태코드 무관, 000=연결거부만 실패)
-      - name: Wait for server
+      # ② TCP 포트가 열릴 때까지 대기 (연결 성공 = HTTP 지정 코드 실제 응답)
+      - name: Wait for server to be ready
         run: |
           echo "🔄 서버 응답 대기 중 (http://localhost:3000)..."
           for i in $(seq 1 45); do
@@ -105,11 +105,12 @@ jobs:
             fi
             if [ $((i % 5)) -eq 0 ]; then
               echo "--- 서버 로그 (${i}x2초) ---"
-              tail -10 /tmp/next-server.log 2>/dev/null || true
+              tail -15 /tmp/next-server.log 2>/dev/null || true
             fi
             sleep 2
           done
           echo "❌ 90초 후에도 서버가 응답하지 않습니다"
+          echo "--- 전체 서버 로그 ---"
           cat /tmp/next-server.log 2>/dev/null || true
           exit 1
 
