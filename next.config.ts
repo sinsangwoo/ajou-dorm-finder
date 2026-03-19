@@ -53,7 +53,7 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
-  output: 'standalone',
+  // output: 'standalone' 제거 — npm start / Vercel 먹실 쭔인이 실패하는 원인
   reactStrictMode: true,
 
   // Turbopack: required for Next.js 16 (default builder).
