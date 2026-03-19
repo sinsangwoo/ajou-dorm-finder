@@ -65,7 +65,7 @@ jobs:
       - name: Type check
         run: npx tsc --noEmit
 
-  # ── Job 3: E2E test suite ────────────────────────────────────────────────
+  # ── Job 3: E2E test suite ──────────────────────────────────────────────────
   e2e:
     name: Playwright E2E
     runs-on: ubuntu-latest
@@ -94,37 +94,41 @@ jobs:
           NEXT_PUBLIC_TENANT_ID: ajou
           NEXT_PUBLIC_SITE_URL:  http://localhost:3000
 
-      # ① 빌드된 앱을 백그라운드에서 실행
-      # output: 'standalone' 빌드에서는 .next/standalone/server.js 를 직접 실행합니다.
-      # 일반 `next start` 는 node_modules가 필요하지만
-      # standalone 모드는 독립적으로 실행되므로 을 사용합니다.
+      # ① next start 로 프로덕션 서버를 백그라운드에서 시작
+      #   - output: 'standalone' 빌드여도 next start 는 정상 동작합니다
+      #   - nohup + 로그 파일로 기동 상태를 추적 가능하게 합니다
       - name: Start server (background)
         run: |
-          # standalone 빌드를 public 설정과 함께 시작
-          # (public/ 폴더는 standalone에 포함되지 않으므로 링크 필요)
-          cp -r public .next/standalone/public 2>/dev/null || true
-          cp -r .next/static .next/standalone/.next/static 2>/dev/null || true
-          PORT=3000 node .next/standalone/server.js &
+          nohup npx next start --port 3000 --hostname 0.0.0.0 > /tmp/next-server.log 2>&1 &
           echo "SERVER_PID=$!" >> $GITHUB_ENV
+          echo "서버 PID: $!"
         env:
-          PORT: 3000
-          HOSTNAME: 0.0.0.0
           NEXT_PUBLIC_TENANT_ID: ajou
           NEXT_PUBLIC_SITE_URL:  http://localhost:3000
 
-      # ② 서버가 실제로 응답할 때까지 대기
-      # 최대 60초 동안 2초 간격으로 HTTP 200을 확인
-      - name: Wait for server
+      # ② 서버가 실제로 TCP 포트를 열 때까지 대기
+      #   - curl --fail(-f) 없이 사용: 연결 자체만 확인 (4xx/5xx 도 OK)
+      #   - 서버 로그를 주기적으로 출력해 디버깅 용이하게 함
+      #   - 최대 90초 대기 (Next.js cold start 여유 확보)
+      - name: Wait for server to be ready
         run: |
           echo "🔄 서버 응답 대기 중 (http://localhost:3000)..."
-          for i in $(seq 1 30); do
-            if curl -sf http://localhost:3000 > /dev/null 2>&1; then
-              echo "✅ 서버 준비 완료 ($((i*2))초 소요)"
+          for i in $(seq 1 45); do
+            STATUS=$(curl -o /dev/null -s -w "%{http_code}" http://localhost:3000 || echo "000")
+            if [ "$STATUS" != "000" ]; then
+              echo "✅ 서버 준비 완료 — HTTP $STATUS ($((i*2))초 소요)"
               exit 0
+            fi
+            # 10초마다 서버 로그 스냅샷 출력
+            if [ $((i % 5)) -eq 0 ]; then
+              echo "--- server log (${i}회차) ---"
+              tail -20 /tmp/next-server.log || true
             fi
             sleep 2
           done
-          echo "❌ 60초 후에도 서버가 응답하지 않습니다"
+          echo "❌ 90초 후에도 서버가 응답하지 않습니다"
+          echo "--- 최종 서버 로그 ---"
+          cat /tmp/next-server.log || true
           exit 1
 
       # ③ E2E 테스트 실행
